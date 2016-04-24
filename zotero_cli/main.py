@@ -80,7 +80,7 @@ class ZoteroCli(object):
         if not api_key or not library_id:
             raise ValueError(
                 "Please set your API key and library ID in the configuration file "
-                "({}) or pass them as command-line options. If you do not have "
+                "({}) or pass them as command-line options.\nIf you do not have "
                 "these, please go to https://www.zotero.org/settings/keys to "
                 "retrieve them.".format(cfg_path))
         self._zot = Zotero(library_id=library_id, api_key=api_key,
@@ -109,7 +109,8 @@ class ZoteroCli(object):
         for it in items:
             yield {'key': it['data']['key'],
                    'creator': it['meta'].get('creatorSummary'),
-                   'title': it['data']['title'],
+                   'title': it['data'].get('title', "Untitled"),
+                   'date': it['data'].get('date'),
                    'has_children': it['meta'].get('numChildren', 0) > 0}
 
     def notes(self, item_id):
@@ -163,14 +164,18 @@ def cli(ctx, api_key, library_id, library_type):
 @click.argument("query", required=False)
 @click.option("--limit", type=int, default=100)
 @click.pass_context
-def list(ctx, query, limit):
+def items(ctx, query, limit):
     """ Search for items in the Zotero database. """
-    for it in ctx.obj.items(query, limit):
+    for item in ctx.obj.items(query, limit):
         click.echo(
-            u"{key} {creator}{title}".format(
-                key=click.style(u"[{}]".format(it['key'], fg='green')),
-                creator=it['creator'] + u': ' if it['creator'] else '',
-                title=click.style(it['title'], fg='blue')))
+            u"{key} {creator}{title}{date}".format(
+                key=click.style(u"[{}]".format(item['key']), fg='green'),
+                creator=(click.style(item['creator'] + u': ', fg='cyan')
+                            if item['creator'] else ''),
+                title=click.style(item['title'], fg='blue'),
+                date=(click.style(" ({})".format(item['date']),
+                                    fg='yellow')
+                        if item['date'] else '')))
 
 
 @cli.command("add-note")
@@ -243,10 +248,12 @@ def select_note(notes):
 def select_item(items):
     for idx, item in enumerate(items):
         click.echo(
-            u"{key} {creator}{title}".format(
+            u"{key} {creator}{title}{date}".format(
                 key=click.style(u"[{}]".format(idx, fg='green')),
                 creator=item['creator'] + u': ' if item['creator'] else '',
-                title=click.style(item['title'], fg='blue')))
+                title=click.style(item['title'], fg='blue'),
+                date=(click.style(" ({})".format(item['date'], fg='yellow'))
+                      if item['date'] else '')))
     while True:
         item_idx = click.prompt("Please select an item", default=0, type=int,
                                 err=True)

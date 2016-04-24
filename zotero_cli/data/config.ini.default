@@ -12,6 +12,3 @@
 
 #: Use this format for editing notes. Supports all formats supported by pandoc
 note_format = markdown
-
-#: Override the editor to be used. Defaults to the $EDITOR envorionment variable
-#editor = nvim
