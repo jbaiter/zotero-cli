@@ -43,13 +43,16 @@ $ zotcli list "deep learning"
 [F5R83K6P] Goodfellow et al.: Deep Learning
 ```
 
-Add a new note to an item:
+Add a new note to an item using either the item's ID or a query string to
+locate it:
 ```
-$zotcli add-note F5R83K6P
+$zotcli add-note "deep learning"
 # Edit note in editor, save and it will be added to the library
 ```
+If more than one item is found for the query string, you will be prompted which
+one to use.
 
-Edit an existing note:
+Edit an existing note (you can use a query string instead of an ID, too):
 ```
 $zotcli edit-note F5R83K6P
 # Edit note in editor, save and it will be updated in the library

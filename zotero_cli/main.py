@@ -14,7 +14,7 @@ EXTENSION_MAP = {
     'docbook': 'dbk',
     'latex': 'tex',
 }
-
+ID_PAT = re.compile(r'[A-Z0-9]{8}')
 
 def get_extension(pandoc_fmt):
     """ Get the file extension for a given pandoc format.
@@ -178,6 +178,14 @@ def list(ctx, query, limit):
 @click.pass_context
 def add_note(ctx, item_id):
     """ Add a new note to an existing item. """
+    if not ID_PAT.match(item_id):
+        items = tuple(ctx.obj.items(item_id))
+        if len(items) > 1:
+            item_id = select_item(items)['key']
+        elif items:
+            item_id = items[0]['key']
+        else:
+            ctx.fail("Could not find any items for the query.")
     note_body = click.edit(extension=get_extension(ctx.obj.note_format))
     ctx.obj.create_note(item_id, note_body)
 
@@ -188,7 +196,17 @@ def add_note(ctx, item_id):
 @click.pass_context
 def edit_note(ctx, item_id, note_num):
     """ Edit a note. """
+    if not ID_PAT.match(item_id):
+        items = tuple(ctx.obj.items(item_id))
+        if len(items) > 1:
+            item_id = select_item(items)['key']
+        elif items:
+            item_id = items[0]['key']
+        else:
+            ctx.fail("Could not find any items for the query.")
     notes = ctx.obj.notes(item_id)
+    if not notes:
+        ctx.fail("The item does not have any notes.")
     if note_num is None:
         if len(notes) > 1:
             note = select_note(notes)
@@ -212,6 +230,28 @@ def select_note(notes):
             u"{key} {words}".format(
                 key=click.style(u"[{}]".format(idx), fg='green'),
                 words=click.style(words, fg='blue')))
-    note_id = click.prompt("Please select a note.", default=0, type=int,
-                           err=True)
-    return notes[note_id]
+    while True:
+        note_id = click.prompt("Please select a note.", default=0, type=int,
+                            err=True)
+        if note_id < 0 or note_id >= len(notes):
+            click.echo("Value must be between 0 and {}!".format(len(notes)-1),
+                       err=True)
+        else:
+            return notes[note_id]
+
+
+def select_item(items):
+    for idx, item in enumerate(items):
+        click.echo(
+            u"{key} {creator}{title}".format(
+                key=click.style(u"[{}]".format(idx, fg='green')),
+                creator=item['creator'] + u': ' if item['creator'] else '',
+                title=click.style(item['title'], fg='blue')))
+    while True:
+        item_idx = click.prompt("Please select an item", default=0, type=int,
+                                err=True)
+        if item_idx < 0 or item_idx >= len(items):
+            click.echo("Value must be between 0 and {}!".format(len(items)-1),
+                       err=True)
+        else:
+            return items[item_idx]
