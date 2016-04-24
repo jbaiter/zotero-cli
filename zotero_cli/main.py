@@ -16,6 +16,7 @@ EXTENSION_MAP = {
 }
 ID_PAT = re.compile(r'[A-Z0-9]{8}')
 
+
 def get_extension(pandoc_fmt):
     """ Get the file extension for a given pandoc format.
 
@@ -75,14 +76,16 @@ class ZoteroCli(object):
 
         api_key = api_key or self.config.get('zotcli.api_key')
         library_id = library_id or self.config.get('zotcli.library_id')
-        library_type = (library_type or self.config.get('zotcli.library_type')
-                        or 'user')
+        library_type = (library_type or
+                        self.config.get('zotcli.library_type') or
+                        'user')
         if not api_key or not library_id:
             raise ValueError(
-                "Please set your API key and library ID in the configuration file "
-                "({}) or pass them as command-line options.\nIf you do not have "
-                "these, please go to https://www.zotero.org/settings/keys to "
-                "retrieve them.".format(cfg_path))
+                "Please set your API key and library ID in the configuration "
+                "file ({}) or pass them as command-line options.\nIf you do "
+                "not have these, please go to "
+                "https://www.zotero.org/settings/keys to retrieve them."
+                .format(cfg_path))
         self._zot = Zotero(library_id=library_id, api_key=api_key,
                            library_type=library_type)
 
@@ -167,15 +170,13 @@ def cli(ctx, api_key, library_id, library_type):
 def query(ctx, query, limit):
     """ Search for items in the Zotero database. """
     for item in ctx.obj.items(query, limit):
-        click.echo(
-            u"{key} {creator}{title}{date}".format(
-                key=click.style(u"[{}]".format(item['key']), fg='green'),
-                creator=(click.style(item['creator'] + u': ', fg='cyan')
-                            if item['creator'] else ''),
-                title=click.style(item['title'], fg='blue'),
-                date=(click.style(" ({})".format(item['date']),
-                                    fg='yellow')
-                        if item['date'] else '')))
+        out = click.style(u"[{}] ".format(item['key']), fg='green')
+        if item['creator']:
+            out += click.style(item['creator'] + u': ', fg='cyan')
+        out += click.style(item['title'], fg='blue')
+        if item['date']:
+            out += click.style(" ({})".format(item['date']), fg='yellow')
+        click.echo(out)
 
 
 @cli.command("add-note")
@@ -230,15 +231,15 @@ def edit_note(ctx, item_id, note_num):
 def select_note(notes):
     for idx, note in enumerate(notes):
         words = u" ".join(
-            re.sub("[^\w]", " ", note['data']['note'].split('\n')[0])
-              .split()[:5])
+            re.sub("[^\w]", " ",
+                   note['data']['note'].split('\n')[0]).split()[:5])
         click.echo(
             u"{key} {words}".format(
                 key=click.style(u"[{}]".format(idx), fg='green'),
                 words=click.style(words, fg='blue')))
     while True:
         note_id = click.prompt("Please select a note.", default=0, type=int,
-                            err=True)
+                               err=True)
         if note_id < 0 or note_id >= len(notes):
             click.echo("Value must be between 0 and {}!".format(len(notes)-1),
                        err=True)
@@ -248,13 +249,13 @@ def select_note(notes):
 
 def select_item(items):
     for idx, item in enumerate(items):
-        click.echo(
-            u"{key} {creator}{title}{date}".format(
-                key=click.style(u"[{}]".format(idx, fg='green')),
-                creator=item['creator'] + u': ' if item['creator'] else '',
-                title=click.style(item['title'], fg='blue'),
-                date=(click.style(" ({})".format(item['date'], fg='yellow'))
-                      if item['date'] else '')))
+        out = click.style(u"[{}] ".format(idx), fg='green')
+        if item['creator']:
+            out += click.style(item['creator'] + u': ', fg="cyan")
+        out += click.style(item['title'], fg='blue')
+        if item['date']:
+            out += click.style(" ({})".format(item['date']), fg='yellow')
+        click.echo(out)
     while True:
         item_idx = click.prompt("Please select an item", default=0, type=int,
                                 err=True)
