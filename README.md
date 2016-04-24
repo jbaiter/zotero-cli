@@ -1,5 +1,7 @@
 # zotero-cli
 
+[![asciicast](https://asciinema.org/a/bf9x2wiut6x95vd6dged7kfrc.png)](https://asciinema.org/a/bf9x2wiut6x95vd6dged7kfrc)
+
 A simple command-line interface for the Zotero API.
 
 Currently the following features are supported:
