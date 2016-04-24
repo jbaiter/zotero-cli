@@ -1,0 +1,17 @@
+[zotcli]
+#: This should contain your personal API key, as obtained from
+#: https://www.zotero.org/settings/keys
+#api_key = SETME
+
+#: This is your `userID` from the above website
+#library_id = SETME
+
+#: This specifies the type of library designated by `library_id`. Can be
+#: "user" or "group"
+# library_type = user
+
+#: Use this format for editing notes. Supports all formats supported by pandoc
+note_format = markdown
+
+#: Override the editor to be used. Defaults to the $EDITOR envorionment variable
+#editor = nvim
