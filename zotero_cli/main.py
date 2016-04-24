@@ -192,7 +192,8 @@ def add_note(ctx, item_id):
         else:
             ctx.fail("Could not find any items for the query.")
     note_body = click.edit(extension=get_extension(ctx.obj.note_format))
-    ctx.obj.create_note(item_id, note_body)
+    if note_body:
+        ctx.obj.create_note(item_id, note_body)
 
 
 @cli.command("edit-note")
