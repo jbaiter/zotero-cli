@@ -164,7 +164,7 @@ def cli(ctx, api_key, library_id, library_type):
 @click.argument("query", required=False)
 @click.option("--limit", type=int, default=100)
 @click.pass_context
-def items(ctx, query, limit):
+def query(ctx, query, limit):
     """ Search for items in the Zotero database. """
     for item in ctx.obj.items(query, limit):
         click.echo(
