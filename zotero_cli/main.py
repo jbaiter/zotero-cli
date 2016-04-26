@@ -124,13 +124,14 @@ class ZoteroCli(object):
         if limit:
             query_args['limit'] = limit
         query_fn = self._zot.items if recursive else self._zot.top
-        items = self._zot.everything(query_fn(**query_args))
-        for it in items:
-            yield {'key': it['data']['key'],
-                   'creator': it['meta'].get('creatorSummary'),
-                   'title': it['data'].get('title', "Untitled"),
-                   'date': it['data'].get('date'),
-                   'has_children': it['meta'].get('numChildren', 0) > 0}
+        items = self._zot.makeiter(query_fn(**query_args))
+        for chunk in items:
+            for it in chunk:
+                yield {'key': it['data']['key'],
+                       'creator': it['meta'].get('creatorSummary'),
+                       'title': it['data'].get('title', "Untitled"),
+                       'date': it['data'].get('date'),
+                       'has_children': it['meta'].get('numChildren', 0) > 0}
 
     def notes(self, item_id):
         """ Get a list of all notes for a given item.
