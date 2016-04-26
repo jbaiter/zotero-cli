@@ -246,9 +246,14 @@ def query(ctx, query, limit):
 
 @cli.command("add-note")
 @click.argument("item-id", required=True)
+@click.option("--note-format", "-f", required=False,
+              help=("Markup format for editing notes, see the pandoc docs for "
+                    "possible values"))
 @click.pass_context
-def add_note(ctx, item_id):
+def add_note(ctx, item_id, note_format):
     """ Add a new note to an existing item. """
+    if note_format:
+        ctx.obj.note_format = note_format
     if not ID_PAT.match(item_id):
         items = tuple(ctx.obj.items(item_id))
         if len(items) > 1:
