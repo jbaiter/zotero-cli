@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="zotero-cli",
-    version="0.1",
+    version="0.2",
     description="Command-line interface for the Zotero API",
     author="Johannes Baiter",
     author_email="johannes.baiter@gmail.com",
