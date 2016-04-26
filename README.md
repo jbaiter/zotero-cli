@@ -41,7 +41,7 @@ the configuration file under `~/.config/zotcli/config.ini` and set the
 
 Search for an item:
 ```
-$ zotcli list "deep learning"
+$ zotcli query "deep learning"
 [F5R83K6P] Goodfellow et al.: Deep Learning
 ```
 
