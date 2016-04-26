@@ -199,7 +199,7 @@ class ZoteroCli(object):
         note = self._zot.item_template('note')
         note_data = {'format': self.note_format,
                      'text': note_text,
-                     'version': self._zot.last_modified_version()+1}
+                     'version': self._zot.last_modified_version()+2}
         note['note'] = self._make_note_html(note_data)
         self._zot.create_items([note], item_id)
 
