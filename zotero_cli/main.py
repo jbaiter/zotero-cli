@@ -1,4 +1,6 @@
 from __future__ import print_function
+import json
+import logging
 import os
 import pkg_resources
 import re
@@ -15,6 +17,19 @@ EXTENSION_MAP = {
     'latex': 'tex',
 }
 ID_PAT = re.compile(r'[A-Z0-9]{8}')
+DATA_PAT = re.compile(
+    r'<div class="zotcli-note">.*<p .*title="([A-Za-z0-9+/=\n ]+)">.*</div>',
+    flags=re.DOTALL | re.MULTILINE)
+DATA_TMPL = """
+<div class="zotcli-note">
+    <p xmlns="http://www.w3.org/1999/xhtml"
+       id="zotcli-data" style="color: #cccccc;"
+       xml:base="http://www.w3.org/1999/xhtml"
+       title="{data}">
+    (hidden zotcli data)
+    </p>
+</div>
+"""
 
 
 def get_extension(pandoc_fmt):
@@ -70,6 +85,7 @@ class ZoteroCli(object):
                              will also be loaded from the configuration if
                              not specified
         """
+        self._logger = logging.getLogger()
         cfg_path = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
         self.config = load_config(cfg_path)
         self.note_format = self.config['zotcli.note_format']
@@ -124,9 +140,54 @@ class ZoteroCli(object):
         """
         notes = self._zot.children(item_id, itemType="note")
         for note in notes:
-            note['data']['note'] = pypandoc.convert(
-                note['data']['note'], self.note_format, format='html')
+            note['data']['note'] = self._make_note_data(
+                note_html=note['data']['note'],
+                note_version=note['version'])
         return notes
+
+    def _make_note_data(self, note_html, note_version):
+        """ Converts a note from HTML to the configured markup.
+
+        If the note was previously edited with zotcli, the original markup
+        will be restored. If it was edited with the Zotero UI, it will be
+        converted from the HTML via pandoc.
+
+        :param note_html:       HTML of the note
+        :param note_version:    Library version the note was last edited
+        :returns:               Dictionary with markup, format and version
+        """
+        data = None
+        blobs = DATA_PAT.findall(note_html)
+        # Previously edited with zotcli
+        if blobs:
+            data = json.loads(blobs[0].decode('base64').decode('zlib'))
+            if 'version' not in data:
+                data['version'] = note_version
+            note_html = DATA_PAT.sub("", note_html)
+        # Not previously edited with zotcli or updated from the Zotero UI
+        if not data or data['version'] < note_version:
+            if data['version'] < note_version:
+                self._logger.info("Note changed on server, reloading markup.")
+            note_format = data['format'] if data else self.note_format
+            data = {
+                'format': note_format,
+                'text': pypandoc.convert(
+                    note_html, note_format, format='html'),
+                'version': note_version}
+        return data
+
+    def _make_note_html(self, note_data):
+        """ Converts the note's text to HTML and adds a dummy element that
+            holds the original markup.
+
+        :param note_data:   dict with text, format and version of the note
+        :returns:           Note as HTML
+        """
+        extra_data = DATA_TMPL.format(
+            data=json.dumps(note_data).encode('zlib').encode('base64'))
+        html = pypandoc.convert(note_data['text'], 'html',
+                                format=note_data['format'])
+        return html + extra_data
 
     def create_note(self, item_id, note_text):
         """ Create a new note for a given item.
@@ -135,8 +196,10 @@ class ZoteroCli(object):
         :param note_text:   Text of the note
         """
         note = self._zot.item_template('note')
-        note['note'] = pypandoc.convert(
-            note_text, 'html', format=self.note_format)
+        note_data = {'format': self.note_format,
+                     'text': note_text,
+                     'version': self._zot.last_modified_version()+1}
+        note['note'] = self._make_note_html(note_data)
         self._zot.create_items([note], item_id)
 
     def save_note(self, note):
@@ -144,19 +207,20 @@ class ZoteroCli(object):
 
         :param note:        The updated note
         """
-        note_html = pypandoc.convert(
-            note['data']['note'], 'html', format=self.note_format)
-        note['data']['note'] = note_html
+        note['data']['note']['version'] += 1
+        note['data']['note'] = self._make_note_html(note['data']['note'])
         self._zot.update_item(note)
 
 
 @click.group()
+@click.option('--verbose', is_flag=True)
 @click.option('--api-key', default=None)
 @click.option('--library-id', default=None)
 @click.option('--library-type', type=click.Choice(['user', 'group']),
               default=None)
 @click.pass_context
-def cli(ctx, api_key, library_id, library_type):
+def cli(ctx, verbose, api_key, library_id, library_type):
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.WARNING)
     try:
         ctx.obj = ZoteroCli(api_key, library_id, library_type)
     except ValueError as e:
@@ -221,22 +285,21 @@ def edit_note(ctx, item_id, note_num):
             note = notes[0]
     else:
         note = notes[note_num]
-    updated_note = click.edit(note['data']['note'],
+    updated_text = click.edit(note['data']['note']['text'],
                               extension=get_extension(ctx.obj.note_format))
-    if updated_note:
-        note['data']['note'] = updated_note
+    if updated_text:
+        note['data']['note']['text'] = updated_text
         ctx.obj.save_note(note)
 
 
 def select_note(notes):
     for idx, note in enumerate(notes):
-        words = u" ".join(
-            re.sub("[^\w]", " ",
-                   note['data']['note'].split('\n')[0]).split()[:5])
+        note_text = note['data']['note']['text']
+        first_line = re.sub("[^\w]", " ", note_text.split('\n')[0])
         click.echo(
             u"{key} {words}".format(
                 key=click.style(u"[{}]".format(idx), fg='green'),
-                words=click.style(words, fg='blue')))
+                words=click.style(first_line, fg='blue')))
     while True:
         note_id = click.prompt("Please select a note.", default=0, type=int,
                                err=True)

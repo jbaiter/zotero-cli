@@ -59,14 +59,3 @@ Edit an existing note (you can use a query string instead of an ID, too):
 $ zotcli edit-note F5R83K6P
 # Edit note in editor, save and it will be updated in the library
 ```
-
-## Caveats
-
-**Currently the formatting of the markup will not be preserved**. That is,
-every time a note is submitted to the server it will be converted to HTML and
-the original markup is lost. When editing, the HTML will be converted back to
-the desired markup using pandoc's standard formatting.
-This is due to a limitation in the Zotero API, which applies a very strict
-sanitiziation pass to the submitted HTML, removing any elements where we
-could store the original markup along with the HTML without cluttering
-the display. If you have any ideas on how to work around this, open a PR!
