@@ -214,7 +214,7 @@ class ZoteroCli(object):
 
 
 @click.group()
-@click.option('--verbose', is_flag=True)
+@click.option('--verbose', '-v', is_flag=True)
 @click.option('--api-key', default=None)
 @click.option('--library-id', default=None)
 @click.option('--library-type', type=click.Choice(['user', 'group']),
@@ -230,7 +230,7 @@ def cli(ctx, verbose, api_key, library_id, library_type):
 
 @cli.command()
 @click.argument("query", required=False)
-@click.option("--limit", type=int, default=100)
+@click.option("--limit", "-n", type=int, default=100)
 @click.pass_context
 def query(ctx, query, limit):
     """ Search for items in the Zotero database. """
