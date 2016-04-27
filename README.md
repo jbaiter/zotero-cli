@@ -8,6 +8,7 @@ Currently the following features are supported:
 
 - Search for items in the library
 - Add/Edit notes for existing items
+- Launch reader application for item attachments
 - Edit notes with a text editor of your choice in any format supported by
   pandoc (markdown, reStructuredText, etc.)
 
@@ -48,6 +49,12 @@ Query strings with whitespace must be enclosed in quotes. For details on the
 supported syntax, consult the [SQLite FTS documentation](https://www.sqlite.org/fts3.html#section_3).
 Briefly, supported are `AND`/`OR`/`NOT` operators and prefix-search via the Kleene
 operator (e.g. `pref*`).
+
+Read an item's attachment:
+```
+$ zotcli read "deep learning"
+# Will launch the default PDF viewer with the item's first PDF attachment
+```
 
 Add a new note to an item using either the item's ID or a query string to
 locate it:
