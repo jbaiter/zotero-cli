@@ -1,11 +1,19 @@
 from __future__ import print_function
+import itertools
 import logging
 import os
 import re
 import tempfile
+import urllib
+import urlparse
+import ConfigParser
 
 import click
+import pathlib
+import pypandoc
+from rauth import OAuth1Service
 
+from zotero_cli.common import APP_NAME
 from zotero_cli.backend import ZoteroBackend
 
 EXTENSION_MAP = {
@@ -18,6 +26,14 @@ READ_TYPES = (
     "application/epub+zip",
     "application/x-mobipocket-ebook")
 ID_PAT = re.compile(r'[A-Z0-9]{8}')
+PROFILE_PAT = re.compile(r'([a-z0-9]{8})\.(.*)')
+
+CLIENT_KEY = 'c7d12bbd2c829823ddbc'
+CLIENT_SECRET = 'c1ffe13aaeaa59ebf293'
+REQUEST_TOKEN_URL = 'https://www.zotero.org/oauth/request'
+AUTH_URL = 'https://www.zotero.org/oauth/authorize'
+ACCESS_TOKEN_URL = 'https://www.zotero.org/oauth/access'
+BASE_URL = 'https://api.zotero.org'
 
 
 def get_extension(pandoc_fmt):
@@ -34,19 +50,113 @@ def get_extension(pandoc_fmt):
         return '.' + pandoc_fmt
 
 
+def find_storage_directories():
+    # Zotero plugin
+    home_dir = pathlib.Path(os.environ['HOME'])
+    firefox_dir = home_dir/".mozilla"/"firefox"
+    zotero_dir = home_dir/".zotero"
+    candidate_iter = itertools.chain(firefox_dir.iterdir(),
+                                     zotero_dir.iterdir())
+    for fpath in candidate_iter:
+        if not fpath.is_dir():
+            continue
+        match = PROFILE_PAT.match(fpath.name)
+        if match:
+            storage_path = fpath/"zotero"/"storage"
+            if storage_path.exists():
+                yield (match.group(2), storage_path)
+
+
+def get_api_key():
+    auth = OAuth1Service(
+        name='zotero',
+        consumer_key=CLIENT_KEY,
+        consumer_secret=CLIENT_SECRET,
+        request_token_url=REQUEST_TOKEN_URL,
+        access_token_url=ACCESS_TOKEN_URL,
+        authorize_url=AUTH_URL,
+        base_url=BASE_URL)
+    token, secret = auth.get_request_token(params={'oauth_callback': 'oob'})
+    auth_url = auth.get_authorize_url(token)
+    auth_url += '&' + urllib.urlencode({
+        'name': 'zotero-cli',
+        'library_access': 1,
+        'notes_access': 1,
+        'write_access': 1,
+        'all_groups': 'read'})
+    click.echo("Opening {} in browser, please confirm.".format(auth_url))
+    click.launch(auth_url)
+    verification = click.prompt("Enter verification code")
+    token_resp = auth.get_raw_access_token(
+        token, secret, method='POST', data={'oauth_verifier': verification})
+    if not token_resp:
+        logging.debug(token_resp.content)
+        click.fail("Error during API key generation.")
+    access = urlparse.parse_qs(token_resp.text)
+    return access['oauth_token'][0], access['userID'][0]
+
+
 @click.group()
 @click.option('--verbose', '-v', is_flag=True)
 @click.option('--api-key', default=None)
 @click.option('--library-id', default=None)
-@click.option('--library-type', type=click.Choice(['user', 'group']),
-              default=None)
 @click.pass_context
-def cli(ctx, verbose, api_key, library_id, library_type):
+def cli(ctx, verbose, api_key, library_id):
     logging.basicConfig(level=logging.DEBUG if verbose else logging.WARNING)
-    try:
-        ctx.obj = ZoteroBackend(api_key, library_id, library_type)
-    except ValueError as e:
-        ctx.fail(e.args[0])
+    if ctx.invoked_subcommand != 'configure':
+        try:
+            ctx.obj = ZoteroBackend(api_key, library_id, 'user')
+        except ValueError as e:
+            ctx.fail(e.args[0])
+
+
+@cli.command()
+def configure():
+    """ Perform initial setup. """
+    generate_key = not click.confirm("Do you already have an API key for "
+                                     "zotero-cli?")
+    if generate_key:
+        api_key, library_id = get_api_key()
+    else:
+        api_key = click.prompt("Please enter the API key for zotero-cli")
+        library_id = click.prompt("Please enter your library ID")
+    storage_dirs = tuple(find_storage_directories())
+    storage_dir = None
+    if storage_dirs:
+        for idx, sd in enumerate(storage_dirs):
+            click.echo("[{}] {} ({})".format(idx, *sd))
+        pick = click.prompt("Please select a storage directory "
+                            "(leave empty to enter manually)", type=int,
+                            default=-1)
+        if pick != -1:
+            storage_dir = storage_dirs[pick][1]
+    if storage_dir is None:
+        storage_dir = click.prompt("Please enter the path to your Zotero "
+                                   "storage directory")
+    markup_formats = pypandoc.get_pandoc_formats()[0]
+    for idx, fmt in enumerate(markup_formats):
+        click.echo("[{}] {}".format(idx, fmt))
+    format_idx = click.prompt("Select markup format for notes",
+                              default=markup_formats.index('markdown'),
+                              type=int)
+    note_format = markup_formats[format_idx]
+    cfg_path = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
+    cfg_dir = os.path.dirname(cfg_path)
+    if not os.path.exists(cfg_dir):
+        os.makedirs(cfg_dir)
+    cfg = ConfigParser.SafeConfigParser()
+    cfg.add_section("zotcli")
+    cfg.set("zotcli", "api_key", api_key)
+    cfg.set("zotcli", "library_id", library_id)
+    cfg.set("zotcli", "storage_directory", storage_dir)
+    cfg.set("zotcli", "note_format", note_format)
+    cfg.set("zotcli", "sync_interval", "300")
+    with open(cfg_path, "w") as fp:
+        cfg.write(fp)
+    zot = ZoteroBackend(api_key, library_id, 'user')
+    click.echo("Initializing local index...")
+    num_synced = zot.synchronize()
+    click.echo("Synchronized {} items.".format(num_synced))
 
 
 @cli.command()

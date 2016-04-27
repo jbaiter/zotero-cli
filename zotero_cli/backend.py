@@ -1,9 +1,7 @@
 import json
 import logging
 import os
-import pkg_resources
 import re
-import shutil
 import time
 import ConfigParser
 
@@ -11,11 +9,9 @@ import click
 import pypandoc
 from pyzotero.zotero import Zotero
 
-from zotero_cli.common import Item
+from zotero_cli.common import APP_NAME, Item
 from zotero_cli.index import SearchIndex
 
-
-APP_NAME = "zotcli"
 
 DATA_PAT = re.compile(
     r'<div class="zotcli-note">.*<p .*title="([A-Za-z0-9+/=\n ]+)">.*</div>',
@@ -42,12 +38,6 @@ def load_config(cfg_path):
     :returns:           Configuration
     :rtype:             (flat) dict
     """
-    if not os.path.exists(cfg_path):
-        if not os.path.exists(os.path.dirname(cfg_path)):
-            os.makedirs(os.path.dirname(cfg_path))
-        default_cfg = pkg_resources.resource_filename(
-            __name__, 'data/config.ini.default')
-        shutil.copyfile(default_cfg, cfg_path)
     parser = ConfigParser.RawConfigParser()
     parser.read([cfg_path])
     rv = {}
@@ -58,7 +48,7 @@ def load_config(cfg_path):
 
 
 class ZoteroBackend(object):
-    def __init__(self, api_key=None, library_id=None, library_type=None):
+    def __init__(self, api_key=None, library_id=None, library_type='user'):
         """ Service class for communicating with the Zotero API.
 
         This is mainly a thin wrapper around :py:class:`pyzotero.zotero.Zotero`
@@ -68,12 +58,14 @@ class ZoteroBackend(object):
                             the configuration if not specified
         :param library_id:  Zotero library ID the API key is valid for, will
                             be loaded from the configuration if not specified
-        :param library_type: Type of the library, can be 'user' or 'group',
-                             will also be loaded from the configuration if
-                             not specified
+        :param library_type: Type of the library, can be 'user' or 'group'
         """
         self._logger = logging.getLogger()
         cfg_path = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
+        if not os.path.exists(cfg_path):
+            raise ValueError("Could not find configuration file. Please run "
+                             "`zotcli configure` to perform the first-time "
+                             "setup.")
         idx_path = os.path.join(click.get_app_dir(APP_NAME), 'index.sqlite')
         self.config = load_config(cfg_path)
         self.note_format = self.config['zotcli.note_format']
@@ -81,9 +73,7 @@ class ZoteroBackend(object):
 
         api_key = api_key or self.config.get('zotcli.api_key')
         library_id = library_id or self.config.get('zotcli.library_id')
-        library_type = (library_type or
-                        self.config.get('zotcli.library_type') or
-                        'user')
+
         if not api_key or not library_id:
             raise ValueError(
                 "Please set your API key and library ID in the configuration "
