@@ -93,7 +93,7 @@ class ZoteroCli(object):
         self._zot = Zotero(library_id=library_id, api_key=api_key,
                            library_type=library_type)
         self._index = SearchIndex(idx_path)
-        sync_interval = self.config.get('main.sync_interval', 300)
+        sync_interval = self.config.get('zotcli.sync_interval', 300)
         since_last_sync = int(time.time()) - self._index.last_modified
         if since_last_sync >= sync_interval:
             self._logger.info("{} seconds since last sync, synchronizing."

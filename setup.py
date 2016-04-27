@@ -16,5 +16,5 @@ setup(
         "Pyzotero >= 1.1.15"],
     entry_points="""
         [console_scripts]
-        zotcli=zotero_cli.main:cli
+        zotcli=zotero_cli.cli:cli
     """)
