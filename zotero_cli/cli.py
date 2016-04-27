@@ -1,6 +1,8 @@
 from __future__ import print_function
 import logging
+import os
 import re
+import tempfile
 
 import click
 
@@ -10,6 +12,11 @@ EXTENSION_MAP = {
     'docbook': 'dbk',
     'latex': 'tex',
 }
+READ_TYPES = (
+    "application/pdf",
+    "image/x.djvu",
+    "application/epub+zip",
+    "application/x-mobipocket-ebook")
 ID_PAT = re.compile(r'[A-Z0-9]{8}')
 
 
@@ -45,7 +52,7 @@ def cli(ctx, verbose, api_key, library_id, library_type):
 @cli.command()
 @click.pass_context
 def sync(ctx):
-    """ Synchronize the local search index with the online library. """
+    """ Synchronize the local search index. """
     num_items = ctx.obj.synchronize()
     click.echo("Updated {} items.".format(num_items))
 
@@ -67,6 +74,40 @@ def query(ctx, query, limit):
         click.echo(out)
 
 
+@cli.command()
+@click.argument("item-id", required=True)
+@click.pass_context
+def read(ctx, item_id):
+    """ Read an item attachment. """
+    try:
+        item_id = pick_item(ctx.obj, item_id)
+    except ValueError as e:
+        ctx.fail(e.args[0])
+    read_att = None
+    for mime_type in READ_TYPES:
+        for attachment in ctx.obj.attachments(item_id):
+            if attachment['data']['contentType'] == mime_type:
+                read_att = attachment
+                break
+    if not read_att:
+        ctx.fail("Could not find an attachment for reading.")
+    if 'path' not in read_att['data']:
+        do_download = click.confirm(
+            "Could not find file locally, do you want to download it?",
+            default=True)
+        if do_download:
+            ctx.obj.download_attachment(read_att, tempfile.tempdir)
+            read_att['data']['path'] = os.path.join(
+                tempfile.tempdir, read_att['data']['filename'])
+        else:
+            return
+    if os.path.exists(read_att['data']['path']):
+        click.echo("Opening '{}'.".format(read_att['data']['path']))
+        click.launch(read_att['data']['path'], wait=False)
+    else:
+        ctx.fail("Could not find file '{}'".format(read_att['data']['path']))
+
+
 @cli.command("add-note")
 @click.argument("item-id", required=True)
 @click.option("--note-format", "-f", required=False,
@@ -77,14 +118,10 @@ def add_note(ctx, item_id, note_format):
     """ Add a new note to an existing item. """
     if note_format:
         ctx.obj.note_format = note_format
-    if not ID_PAT.match(item_id):
-        items = tuple(ctx.obj.search(item_id))
-        if len(items) > 1:
-            item_id = select_item(items).key
-        elif items:
-            item_id = items[0].key
-        else:
-            ctx.fail("Could not find any items for the query.")
+    try:
+        item_id = pick_item(ctx.obj, item_id)
+    except ValueError as e:
+        ctx.fail(e.args[0])
     note_body = click.edit(extension=get_extension(ctx.obj.note_format))
     if note_body:
         ctx.obj.create_note(item_id, note_body)
@@ -96,15 +133,11 @@ def add_note(ctx, item_id, note_format):
 @click.pass_context
 def edit_note(ctx, item_id, note_num):
     """ Edit a note. """
-    if not ID_PAT.match(item_id):
-        items = tuple(ctx.obj.search(item_id))
-        if len(items) > 1:
-            item_id = select_item(items).key
-        elif items:
-            item_id = items[0].key
-        else:
-            ctx.fail("Could not find any items for the query.")
-    notes = ctx.obj.notes(item_id)
+    try:
+        item_id = pick_item(ctx.obj, item_id)
+    except ValueError as e:
+        ctx.fail(e.args[0])
+    notes = tuple(ctx.obj.notes(item_id))
     if not notes:
         ctx.fail("The item does not have any notes.")
     if note_num is None:
@@ -137,6 +170,17 @@ def select_note(notes):
                        err=True)
         else:
             return notes[note_id]
+
+
+def pick_item(zot, item_id):
+    if not ID_PAT.match(item_id):
+        items = tuple(zot.search(item_id))
+        if len(items) > 1:
+            return select_item(items).key
+        elif items:
+            return items[0].key
+        else:
+            raise ValueError("Could not find any items for the query.")
 
 
 def select_item(items):

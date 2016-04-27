@@ -77,6 +77,7 @@ class ZoteroBackend(object):
         idx_path = os.path.join(click.get_app_dir(APP_NAME), 'index.sqlite')
         self.config = load_config(cfg_path)
         self.note_format = self.config['zotcli.note_format']
+        self.storage_dir = self.config.get('zotcli.storage_directory')
 
         api_key = api_key or self.config.get('zotcli.api_key')
         library_id = library_id or self.config.get('zotcli.library_id')
@@ -154,12 +155,37 @@ class ZoteroBackend(object):
         """
         notes = self._zot.children(item_id, itemType="note")
         for note in notes:
-            note['data']['note'] = self._make_note_data(
-                note_html=note['data']['note'],
-                note_version=note['version'])
-        return notes
+            note['data']['note'] = self._make_note(note)
+            yield note
 
-    def _make_note_data(self, note_html, note_version):
+    def attachments(self, item_id):
+        """ Get a list of all attachments for a given item.
+
+        If a zotero profile directory is specified in the configuration,
+        a resolved local file path will be included, if the file exists.
+
+        :param item_id:     ID/key of the item to get attachments for
+        :returns:           Attachments for item
+        """
+        attachments = self._zot.children(item_id, itemType="attachment")
+        if self.storage_dir:
+            for att in attachments:
+                if not att['data']['linkMode'].startswith("imported"):
+                    continue
+                fpath = os.path.join(self.storage_dir, att['key'],
+                                     att['data']['filename'])
+                if not os.path.exists(fpath):
+                    continue
+                att['data']['path'] = fpath
+        return attachments
+
+    def download_attachment(self, attachment, target_directory):
+        if not attachment['data']['linkMode'].startswith("imported"):
+            raise ValueError(
+                "Attachment is not stored on server, cannot download!")
+        self._zot.dump(attachment['key'], path=target_directory)
+
+    def _make_note(self, note_data):
         """ Converts a note from HTML to the configured markup.
 
         If the note was previously edited with zotcli, the original markup
@@ -171,6 +197,8 @@ class ZoteroBackend(object):
         :returns:               Dictionary with markup, format and version
         """
         data = None
+        note_html = note_data['data']['note']
+        note_version = note_data['version']
         blobs = DATA_PAT.findall(note_html)
         # Previously edited with zotcli
         if blobs:

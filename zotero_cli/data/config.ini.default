@@ -6,6 +6,9 @@
 #: This is your `userID` from the above website
 #library_id = SETME
 
+#: Path to your Zotero storage directory
+#storage_directory = SETME
+
 #: This specifies the type of library designated by `library_id`. Can be
 #: "user" or "group"
 # library_type = user
