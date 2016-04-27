@@ -12,3 +12,6 @@
 
 #: Use this format for editing notes. Supports all formats supported by pandoc
 note_format = markdown
+
+#: Time in seconds between index synchronizations
+sync_interval = 300
