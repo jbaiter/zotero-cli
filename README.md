@@ -25,12 +25,6 @@ If you want to try the bleeding-edge version:
 $ pip install git+git://github.com/jbaiter/zotero-cli.git@master
 ```
 
-The application requires an API key for the Zotero API and the user's library
-ID. These can be obtained/created on https://www.zotero.org/settings/keys.
-If you have them, set the `api_key` and `library_id` in the configuration file
-(`~/.config/zotcli/config.ini`) to the appropriate value.
-
-
 ## Usage
 
 To change the editor on *nix systems, set the `VISUAL` environment variable.
@@ -39,11 +33,21 @@ If you want to use a markup format other than pandoc's `markdown`, edit
 the configuration file under `~/.config/zotcli/config.ini` and set the
 `note_format` field to your desired value (as seen in `pandoc --help`).
 
+First, perform the initial configuration to generate an API key for the
+application:
+```
+$ zotcli configure
+```
+
 Search for an item:
 ```
 $ zotcli query "deep learning"
 [F5R83K6P] Goodfellow et al.: Deep Learning
 ```
+Query strings with whitespace must be enclosed in quotes. For details on the
+supported syntax, consult the [SQLite FTS documentation](https://www.sqlite.org/fts3.html#section_3).
+Briefly, supported are `AND`/`OR`/`NOT` operators and prefix-search via the Kleene
+operator (e.g. `pref*`).
 
 Add a new note to an item using either the item's ID or a query string to
 locate it:
