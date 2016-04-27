@@ -57,7 +57,7 @@ def load_config(cfg_path):
     return rv
 
 
-class ZoteroCli(object):
+class ZoteroBackend(object):
     def __init__(self, api_key=None, library_id=None, library_type=None):
         """ Service class for communicating with the Zotero API.
 

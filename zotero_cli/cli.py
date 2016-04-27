@@ -4,7 +4,7 @@ import re
 
 import click
 
-from zotero_cli.backend import ZoteroCli
+from zotero_cli.backend import ZoteroBackend
 
 EXTENSION_MAP = {
     'docbook': 'dbk',
@@ -37,7 +37,7 @@ def get_extension(pandoc_fmt):
 def cli(ctx, verbose, api_key, library_id, library_type):
     logging.basicConfig(level=logging.DEBUG if verbose else logging.WARNING)
     try:
-        ctx.obj = ZoteroCli(api_key, library_id, library_type)
+        ctx.obj = ZoteroBackend(api_key, library_id, library_type)
     except ValueError as e:
         ctx.fail(e.args[0])
 
