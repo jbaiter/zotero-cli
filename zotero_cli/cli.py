@@ -252,7 +252,10 @@ def edit_note(ctx, item_id, note_num):
         ctx.fail("The item does not have any notes.")
     if note_num is None:
         if len(notes) > 1:
-            note = select_note(notes)
+            note = select(
+                [(n, re.sub("[^\w]", " ",
+                            n['data']['note']['text'].split('\n')[0]))
+                 for n in notes])
         else:
             note = notes[0]
     else:
@@ -264,49 +267,49 @@ def edit_note(ctx, item_id, note_num):
         ctx.obj.save_note(note)
 
 
-def select_note(notes):
-    for idx, note in enumerate(notes):
-        note_text = note['data']['note']['text']
-        first_line = re.sub("[^\w]", " ", note_text.split('\n')[0])
-        click.echo(
-            u"{key} {words}".format(
-                key=click.style(u"[{}]".format(idx), fg='green'),
-                words=click.style(first_line, fg='blue')))
-    while True:
-        note_id = click.prompt("Please select a note.", default=0, type=int,
-                               err=True)
-        if note_id < 0 or note_id >= len(notes):
-            click.echo("Value must be between 0 and {}!".format(len(notes)-1),
-                       err=True)
-        else:
-            return notes[note_id]
-
-
 def pick_item(zot, item_id):
     if not ID_PAT.match(item_id):
         items = tuple(zot.search(item_id))
         if len(items) > 1:
-            return select_item(items).key
+            click.echo("Multiple matches available.")
+            item_descriptions = []
+            for it in items:
+                desc = click.style(it.title, fg='blue')
+                if it.creator:
+                    desc = click.style(it.creator + u': ', fg="cyan") + desc
+                if it.date:
+                    desc += click.style(" ({})".format(it.date), fg='yellow')
+                item_descriptions.append(desc)
+            return select(zip(items, item_descriptions)).key
         elif items:
             return items[0].key
         else:
             raise ValueError("Could not find any items for the query.")
 
 
-def select_item(items):
-    for idx, item in enumerate(items):
-        out = click.style(u"[{}] ".format(idx), fg='green')
-        if item.creator:
-            out += click.style(item.creator + u': ', fg="cyan")
-        out += click.style(item.title, fg='blue')
-        if item.date:
-            out += click.style(" ({})".format(item.date), fg='yellow')
-        click.echo(out)
+def select(choices):
+    """ Let the user pick one of several choices.
+
+
+    :param choices:     Available choices along with their description
+    :type choices:      iterable of (object, str) tuples
+    :returns:           The object the user picked.
+    """
+    choices = list(choices)
+    for idx, choice in enumerate(choices):
+        _, choice_label = choice
+        if '\x1b' not in choice_label:
+            choice_label = click.style(choice_label, fg='blue')
+        click.echo(
+            u"{key} {description}".format(
+                key=click.style(u"[{}]".format(idx), fg='green'),
+                description=choice_label))
     while True:
-        item_idx = click.prompt("Please select an item", default=0, type=int,
-                                err=True)
-        if item_idx < 0 or item_idx >= len(items):
-            click.echo("Value must be between 0 and {}!".format(len(items)-1),
-                       err=True)
+        choice_idx = click.prompt("Please choose one.", default=0, type=int,
+                                  err=True)
+        if choice_idx < 0 or choice_idx >= len(choices):
+            click.echo(
+                "Value must be between 0 and {}!".format(len(choices)-1),
+                err=True)
         else:
-            return items[item_idx]
+            return choices[choice_idx][0]
