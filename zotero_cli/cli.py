@@ -20,11 +20,7 @@ EXTENSION_MAP = {
     'docbook': 'dbk',
     'latex': 'tex',
 }
-READ_TYPES = (
-    "application/pdf",
-    "image/x.djvu",
-    "application/epub+zip",
-    "application/x-mobipocket-ebook")
+
 ID_PAT = re.compile(r'[A-Z0-9]{8}')
 PROFILE_PAT = re.compile(r'([a-z0-9]{8})\.(.*)')
 
@@ -194,13 +190,15 @@ def read(ctx, item_id):
     except ValueError as e:
         ctx.fail(e.args[0])
     read_att = None
-    for mime_type in READ_TYPES:
-        for attachment in ctx.obj.attachments(item_id):
-            if attachment['data']['contentType'] == mime_type:
-                read_att = attachment
-                break
-    if not read_att:
+    attachments = ctx.obj.attachments(item_id)
+    if not attachments:
         ctx.fail("Could not find an attachment for reading.")
+    elif len(attachments) > 1:
+        click.echo("Multiple attachments available.")
+        read_att = select([(att, att['data']['title'])
+                           for att in attachments])
+    else:
+        read_att = attachments[0]
     if 'path' not in read_att['data']:
         do_download = click.confirm(
             "Could not find file locally, do you want to download it?",
