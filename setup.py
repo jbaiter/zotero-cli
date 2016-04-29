@@ -13,7 +13,9 @@ setup(
         "setuptools-git",
         "Click >= 6.6",
         "pypandoc >= 1.1.3",
-        "Pyzotero >= 1.1.15"],
+        "Pyzotero >= 1.1.15",
+        "pathlib >= 1.0.1",
+        "rauth >= 0.7.2"],
     entry_points="""
         [console_scripts]
         zotcli=zotero_cli.cli:cli
