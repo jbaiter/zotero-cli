@@ -4,13 +4,10 @@ import logging
 import os
 import re
 import tempfile
-import urllib
-import urlparse
 
 import click
 import pathlib
 import pypandoc
-from rauth import OAuth1Service
 
 from zotero_cli.common import save_config
 from zotero_cli.backend import ZoteroBackend
@@ -22,13 +19,6 @@ EXTENSION_MAP = {
 
 ID_PAT = re.compile(r'[A-Z0-9]{8}')
 PROFILE_PAT = re.compile(r'([a-z0-9]{8})\.(.*)')
-
-CLIENT_KEY = 'c7d12bbd2c829823ddbc'
-CLIENT_SECRET = 'c1ffe13aaeaa59ebf293'
-REQUEST_TOKEN_URL = 'https://www.zotero.org/oauth/request'
-AUTH_URL = 'https://www.zotero.org/oauth/authorize'
-ACCESS_TOKEN_URL = 'https://www.zotero.org/oauth/access'
-BASE_URL = 'https://api.zotero.org'
 
 
 def get_extension(pandoc_fmt):
@@ -62,41 +52,13 @@ def find_storage_directories():
                 yield (match.group(2), storage_path)
 
 
-def get_api_key():
-    auth = OAuth1Service(
-        name='zotero',
-        consumer_key=CLIENT_KEY,
-        consumer_secret=CLIENT_SECRET,
-        request_token_url=REQUEST_TOKEN_URL,
-        access_token_url=ACCESS_TOKEN_URL,
-        authorize_url=AUTH_URL,
-        base_url=BASE_URL)
-    token, secret = auth.get_request_token(params={'oauth_callback': 'oob'})
-    auth_url = auth.get_authorize_url(token)
-    auth_url += '&' + urllib.urlencode({
-        'name': 'zotero-cli',
-        'library_access': 1,
-        'notes_access': 1,
-        'write_access': 1,
-        'all_groups': 'read'})
-    click.echo("Opening {} in browser, please confirm.".format(auth_url))
-    click.launch(auth_url)
-    verification = click.prompt("Enter verification code")
-    token_resp = auth.get_raw_access_token(
-        token, secret, method='POST', data={'oauth_verifier': verification})
-    if not token_resp:
-        logging.debug(token_resp.content)
-        click.fail("Error during API key generation.")
-    access = urlparse.parse_qs(token_resp.text)
-    return access['oauth_token'][0], access['userID'][0]
-
-
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.option('--verbose', '-v', is_flag=True)
 @click.option('--api-key', default=None)
 @click.option('--library-id', default=None)
 @click.pass_context
 def cli(ctx, verbose, api_key, library_id):
+    """ Command-line access to your Zotero library. """
     logging.basicConfig(level=logging.DEBUG if verbose else logging.WARNING)
     if ctx.invoked_subcommand != 'configure':
         try:
@@ -111,7 +73,7 @@ def configure():
     generate_key = not click.confirm("Do you already have an API key for "
                                      "zotero-cli?")
     if generate_key:
-        api_key, library_id = get_api_key()
+        api_key, library_id = ZoteroBackend.create_api_key()
     else:
         api_key = click.prompt("Please enter the API key for zotero-cli")
         library_id = click.prompt("Please enter your library ID")

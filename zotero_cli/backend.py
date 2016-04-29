@@ -3,11 +3,13 @@ import logging
 import os
 import re
 import time
-import ConfigParser
+import urllib
+import urlparse
 
 import click
 import pypandoc
 from pyzotero.zotero import Zotero
+from rauth import OAuth1Service
 
 from zotero_cli.common import APP_NAME, Item, load_config
 from zotero_cli.index import SearchIndex
@@ -27,9 +29,52 @@ DATA_TMPL = """
         </p>
     </div>
 """
+CLIENT_KEY = 'c7d12bbd2c829823ddbc'
+CLIENT_SECRET = 'c1ffe13aaeaa59ebf293'
+REQUEST_TOKEN_URL = 'https://www.zotero.org/oauth/request'
+AUTH_URL = 'https://www.zotero.org/oauth/authorize'
+ACCESS_TOKEN_URL = 'https://www.zotero.org/oauth/access'
+BASE_URL = 'https://api.zotero.org'
 
 
 class ZoteroBackend(object):
+    @classmethod
+    def create_api_key():
+        """ Interactively create a new API key via Zotero's OAuth API.
+
+        Requires the user to enter a verification key displayed in the browser.
+
+        :returns:   API key and the user's library ID
+        """
+        auth = OAuth1Service(
+            name='zotero',
+            consumer_key=CLIENT_KEY,
+            consumer_secret=CLIENT_SECRET,
+            request_token_url=REQUEST_TOKEN_URL,
+            access_token_url=ACCESS_TOKEN_URL,
+            authorize_url=AUTH_URL,
+            base_url=BASE_URL)
+        token, secret = auth.get_request_token(
+            params={'oauth_callback': 'oob'})
+        auth_url = auth.get_authorize_url(token)
+        auth_url += '&' + urllib.urlencode({
+            'name': 'zotero-cli',
+            'library_access': 1,
+            'notes_access': 1,
+            'write_access': 1,
+            'all_groups': 'read'})
+        click.echo("Opening {} in browser, please confirm.".format(auth_url))
+        click.launch(auth_url)
+        verification = click.prompt("Enter verification code")
+        token_resp = auth.get_raw_access_token(
+            token, secret, method='POST',
+            data={'oauth_verifier': verification})
+        if not token_resp:
+            logging.debug(token_resp.content)
+            click.fail("Error during API key generation.")
+        access = urlparse.parse_qs(token_resp.text)
+        return access['oauth_token'][0], access['userID'][0]
+
     def __init__(self, api_key=None, library_id=None, library_type='user'):
         """ Service class for communicating with the Zotero API.
 
