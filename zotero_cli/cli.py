@@ -91,7 +91,7 @@ def get_api_key():
     return access['oauth_token'][0], access['userID'][0]
 
 
-@click.group()
+@click.group(context_settings={'help_option_names': ['-h', '--help']})
 @click.option('--verbose', '-v', is_flag=True)
 @click.option('--api-key', default=None)
 @click.option('--library-id', default=None)
