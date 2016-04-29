@@ -6,14 +6,13 @@ import re
 import tempfile
 import urllib
 import urlparse
-import ConfigParser
 
 import click
 import pathlib
 import pypandoc
 from rauth import OAuth1Service
 
-from zotero_cli.common import APP_NAME
+from zotero_cli.common import save_config
 from zotero_cli.backend import ZoteroBackend
 
 EXTENSION_MAP = {
@@ -119,36 +118,32 @@ def configure():
     storage_dirs = tuple(find_storage_directories())
     storage_dir = None
     if storage_dirs:
-        for idx, sd in enumerate(storage_dirs):
-            click.echo("[{}] {} ({})".format(idx, *sd))
-        pick = click.prompt("Please select a storage directory "
-                            "(leave empty to enter manually)", type=int,
-                            default=-1)
-        if pick != -1:
-            storage_dir = storage_dirs[pick][1]
+        options = [(name, "{} ({})".format(click.style(name, fg="cyan"), path))
+                   for name, path in storage_dirs]
+        storage_dir = select(
+            options, required=False,
+            prompt="Please select a storage directory (-1 to enter manually)")
     if storage_dir is None:
-        storage_dir = click.prompt("Please enter the path to your Zotero "
-                                   "storage directory")
+        while True:
+            storage_dir = click.prompt("Please enter the path to your Zotero "
+                                       "storage directory")
+            if not os.path.exists(storage_dir):
+                click.echo("Directory does not exist!")
+            elif not re.match(r'.*storage/?', storage_dir):
+                click.echo("Path must point to a `storage` directory!")
+            else:
+                break
     markup_formats = pypandoc.get_pandoc_formats()[0]
-    for idx, fmt in enumerate(markup_formats):
-        click.echo("[{}] {}".format(idx, fmt))
-    format_idx = click.prompt("Select markup format for notes",
-                              default=markup_formats.index('markdown'),
-                              type=int)
-    note_format = markup_formats[format_idx]
-    cfg_path = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
-    cfg_dir = os.path.dirname(cfg_path)
-    if not os.path.exists(cfg_dir):
-        os.makedirs(cfg_dir)
-    cfg = ConfigParser.SafeConfigParser()
-    cfg.add_section("zotcli")
-    cfg.set("zotcli", "api_key", api_key)
-    cfg.set("zotcli", "library_id", library_id)
-    cfg.set("zotcli", "storage_directory", storage_dir)
-    cfg.set("zotcli", "note_format", note_format)
-    cfg.set("zotcli", "sync_interval", "300")
-    with open(cfg_path, "w") as fp:
-        cfg.write(fp)
+    note_format = select(zip(markup_formats, markup_formats),
+                         default=markup_formats.index('markdown'),
+                         prompt="Select markup format for notes")
+
+    save_config({
+        'api_key': api_key,
+        'library_id': library_id,
+        'storage_directory': storage_dir,
+        'note_format': note_format,
+        'sync_interval': 300})
     zot = ZoteroBackend(api_key, library_id, 'user')
     click.echo("Initializing local index...")
     num_synced = zot.synchronize()
@@ -285,13 +280,16 @@ def pick_item(zot, item_id):
             raise ValueError("Could not find any items for the query.")
 
 
-def select(choices):
+def select(choices, prompt="Please choose one", default=0, required=True):
     """ Let the user pick one of several choices.
 
 
     :param choices:     Available choices along with their description
     :type choices:      iterable of (object, str) tuples
-    :returns:           The object the user picked.
+    :param default:     Index of default choice
+    :type default:      int
+    :param required:    If true, `None` can be returned
+    :returns:           The object the user picked or None.
     """
     choices = list(choices)
     for idx, choice in enumerate(choices):
@@ -303,11 +301,13 @@ def select(choices):
                 key=click.style(u"[{}]".format(idx), fg='green'),
                 description=choice_label))
     while True:
-        choice_idx = click.prompt("Please choose one.", default=0, type=int,
-                                  err=True)
-        if choice_idx < 0 or choice_idx >= len(choices):
+        choice_idx = click.prompt(prompt, default=default, type=int, err=True)
+        cutoff = -1 if not required else 0
+        if choice_idx < cutoff or choice_idx >= len(choices):
             click.echo(
-                "Value must be between 0 and {}!".format(len(choices)-1),
-                err=True)
+                "Value must be between {} and {}!"
+                .format(cutoff, len(choices)-1), err=True)
+        elif choice_idx == -1:
+            return None
         else:
             return choices[choice_idx][0]

@@ -9,7 +9,7 @@ import click
 import pypandoc
 from pyzotero.zotero import Zotero
 
-from zotero_cli.common import APP_NAME, Item
+from zotero_cli.common import APP_NAME, Item, load_config
 from zotero_cli.index import SearchIndex
 
 
@@ -29,24 +29,6 @@ DATA_TMPL = """
 """
 
 
-def load_config(cfg_path):
-    """ Load (and create default config if it doesn't exist) configuration
-        from application directory.
-
-    :param cfg_path:    Path to configuration file
-    :type cfg_path:     str/unicode
-    :returns:           Configuration
-    :rtype:             (flat) dict
-    """
-    parser = ConfigParser.RawConfigParser()
-    parser.read([cfg_path])
-    rv = {}
-    for section in parser.sections():
-        for key, value in parser.items(section):
-            rv['%s.%s' % (section, key)] = value
-    return rv
-
-
 class ZoteroBackend(object):
     def __init__(self, api_key=None, library_id=None, library_type='user'):
         """ Service class for communicating with the Zotero API.
@@ -61,13 +43,8 @@ class ZoteroBackend(object):
         :param library_type: Type of the library, can be 'user' or 'group'
         """
         self._logger = logging.getLogger()
-        cfg_path = os.path.join(click.get_app_dir(APP_NAME), 'config.ini')
-        if not os.path.exists(cfg_path):
-            raise ValueError("Could not find configuration file. Please run "
-                             "`zotcli configure` to perform the first-time "
-                             "setup.")
         idx_path = os.path.join(click.get_app_dir(APP_NAME), 'index.sqlite')
-        self.config = load_config(cfg_path)
+        self.config = load_config()
         self.note_format = self.config['zotcli.note_format']
         self.storage_dir = self.config.get('zotcli.storage_directory')
 
@@ -76,11 +53,8 @@ class ZoteroBackend(object):
 
         if not api_key or not library_id:
             raise ValueError(
-                "Please set your API key and library ID in the configuration "
-                "file ({}) or pass them as command-line options.\nIf you do "
-                "not have these, please go to "
-                "https://www.zotero.org/settings/keys to retrieve them."
-                .format(cfg_path))
+                "Please set your API key and library ID by running "
+                "`zotcli configure` or pass them as command-line options.")
         self._zot = Zotero(library_id=library_id, api_key=api_key,
                            library_type=library_type)
         self._index = SearchIndex(idx_path)
