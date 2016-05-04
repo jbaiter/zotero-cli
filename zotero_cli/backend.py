@@ -2,12 +2,18 @@ import json
 import logging
 import os
 import re
+import tempfile
 import time
 import urllib
 import urlparse
+import zipfile
+from cStringIO import StringIO
+
 
 import click
 import pypandoc
+import requests
+from pathlib import Path
 from pyzotero.zotero import Zotero
 from rauth import OAuth1Service
 
@@ -15,6 +21,7 @@ from zotero_cli.common import APP_NAME, Item, load_config
 from zotero_cli.index import SearchIndex
 
 
+TEMP_DIR = Path(tempfile.mkdtemp(prefix='zotcli'))
 DATA_PAT = re.compile(
     r'<div class="zotcli-note">.*<p .*title="([A-Za-z0-9+/=\n ]+)">.*</div>',
     flags=re.DOTALL | re.MULTILINE)
@@ -38,7 +45,7 @@ BASE_URL = 'https://api.zotero.org'
 
 
 class ZoteroBackend(object):
-    @classmethod
+    @staticmethod
     def create_api_key():
         """ Interactively create a new API key via Zotero's OAuth API.
 
@@ -188,11 +195,30 @@ class ZoteroBackend(object):
                 att['data']['path'] = fpath
         return attachments
 
-    def download_attachment(self, attachment, target_directory):
+    def get_attachment_path(self, attachment):
         if not attachment['data']['linkMode'].startswith("imported"):
             raise ValueError(
                 "Attachment is not stored on server, cannot download!")
-        self._zot.dump(attachment['key'], path=target_directory)
+        storage_method = self.config['zotcli.sync_method']
+        if storage_method == 'local':
+            return Path(attachment['data']['path'])
+        # Download
+        out_path = TEMP_DIR/attachment['data']['filename']
+        if out_path.exists():
+            return out_path
+        if storage_method == 'zotero':
+            self._zot.dump(attachment['key'], path=unicode(TEMP_DIR))
+            return out_path
+        elif storage_method == 'webdav':
+            user = self.config['zotcli.webdav_user']
+            password = self.config['zotcli.webdav_pass']
+            location = self.config['zotcli.webdav_path']
+            zip_url = "{}/zotero/{}.zip".format(
+                location, attachment['key'])
+            resp = requests.get(zip_url, auth=(user, password))
+            zf = zipfile.ZipFile(StringIO(resp.content))
+            zf.extractall(str(TEMP_DIR))
+        return out_path
 
     def _make_note(self, note_data):
         """ Converts a note from HTML to the configured markup.

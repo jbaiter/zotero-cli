@@ -3,11 +3,11 @@ import itertools
 import logging
 import os
 import re
-import tempfile
 
 import click
 import pathlib
 import pypandoc
+import requests
 
 from zotero_cli.common import save_config
 from zotero_cli.backend import ZoteroBackend
@@ -36,7 +36,6 @@ def get_extension(pandoc_fmt):
 
 
 def find_storage_directories():
-    # Zotero plugin
     home_dir = pathlib.Path(os.environ['HOME'])
     firefox_dir = home_dir/".mozilla"/"firefox"
     zotero_dir = home_dir/".zotero"
@@ -70,43 +69,90 @@ def cli(ctx, verbose, api_key, library_id):
 @cli.command()
 def configure():
     """ Perform initial setup. """
+    config = {
+        'sync_interval': 300
+    }
     generate_key = not click.confirm("Do you already have an API key for "
                                      "zotero-cli?")
     if generate_key:
-        api_key, library_id = ZoteroBackend.create_api_key()
+        (config['api_key'],
+         config['library_id']) = ZoteroBackend.create_api_key()
     else:
-        api_key = click.prompt("Please enter the API key for zotero-cli")
-        library_id = click.prompt("Please enter your library ID")
-    storage_dirs = tuple(find_storage_directories())
-    storage_dir = None
-    if storage_dirs:
-        options = [(name, "{} ({})".format(click.style(name, fg="cyan"), path))
-                   for name, path in storage_dirs]
-        storage_dir = select(
-            options, required=False,
-            prompt="Please select a storage directory (-1 to enter manually)")
-    if storage_dir is None:
+        config['api_key'] = click.prompt(
+            "Please enter the API key for zotero-cli")
+        config['library_id'] = click.prompt("Please enter your library ID")
+    sync_method = select(
+        [("local", "Local Zotero storage"),
+            ("zotcoud", "Use Zotero file cloud"),
+            ("webdav", "Use WebDAV storage")],
+        default=1, required=True,
+        prompt="How do you want to access files for reading?")
+    if sync_method == "local":
+        storage_dirs = tuple(find_storage_directories())
+        if storage_dirs:
+            options = [(name, "{} ({})".format(click.style(name, fg="cyan"),
+                                               path))
+                       for name, path in storage_dirs]
+            config['storage_dir'] = select(
+                options, required=False,
+                prompt="Please select a storage directory (-1 to enter "
+                       "manually)")
+        if config.get('storage_dir') is None:
+            click.echo(
+                "Could not automatically locate a Zotero storage directory.")
+            while True:
+                storage_dir = click.prompt(
+                    "Please enter the path to your Zotero storage directory",
+                    default='')
+                if not storage_dir:
+                    storage_dir = None
+                    break
+                elif not os.path.exists(storage_dir):
+                    click.echo("Directory does not exist!")
+                elif not re.match(r'.*storage/?', storage_dir):
+                    click.echo("Path must point to a `storage` directory!")
+                else:
+                    config['storage_dir'] = storage_dir
+                    break
+    elif sync_method == "webdav":
         while True:
-            storage_dir = click.prompt("Please enter the path to your Zotero "
-                                       "storage directory")
-            if not os.path.exists(storage_dir):
-                click.echo("Directory does not exist!")
-            elif not re.match(r'.*storage/?', storage_dir):
-                click.echo("Path must point to a `storage` directory!")
-            else:
+            if not config.get('webdav_path'):
+                config['webdav_path'] = click.prompt(
+                    "Please enter the WebDAV URL")
+            if not config.get('webdav_user'):
+                config['webdav_user'] = click.prompt(
+                    "Please enter the WebDAV user name")
+                config['webdav_pass'] = click.prompt(
+                    "Please enter the WebDAV password")
+            try:
+                test_resp = requests.get(
+                    config['webdav_path'],
+                    auth=(config['webdav_user'],
+                          config['webdav_pass']))
+            except requests.ConnectionError:
+                click.echo("Invalid WebDAV URL, could not reach server.")
+                config['webdav_path'] = None
+                continue
+            if test_resp.status_code == 501:
                 break
-    markup_formats = pypandoc.get_pandoc_formats()[0]
-    note_format = select(zip(markup_formats, markup_formats),
-                         default=markup_formats.index('markdown'),
-                         prompt="Select markup format for notes")
+            elif test_resp.status_code == 404:
+                click.echo("Invalid WebDAV path, does not exist.")
+                config['webdav_path'] = None
+            elif test_resp.status_code == 401:
+                click.echo("Bad credentials.")
+                config['webdav_user'] = None
+            else:
+                click.echo("Unknown error, please check your settings.")
+                config['webdav_path'] = None
+                config['webdav_user'] = None
+    config['sync_method'] = sync_method
 
-    save_config({
-        'api_key': api_key,
-        'library_id': library_id,
-        'storage_directory': storage_dir,
-        'note_format': note_format,
-        'sync_interval': 300})
-    zot = ZoteroBackend(api_key, library_id, 'user')
+    markup_formats = pypandoc.get_pandoc_formats()[0]
+    config['note_format'] = select(zip(markup_formats, markup_formats),
+                                   default=markup_formats.index('markdown'),
+                                   prompt="Select markup format for notes")
+    save_config(config)
+    zot = ZoteroBackend(config['api_key'], config['library_id'], 'user')
     click.echo("Initializing local index...")
     num_synced = zot.synchronize()
     click.echo("Synchronized {} items.".format(num_synced))
@@ -156,21 +202,10 @@ def read(ctx, item_id):
                            for att in attachments])
     else:
         read_att = attachments[0]
-    if 'path' not in read_att['data']:
-        do_download = click.confirm(
-            "Could not find file locally, do you want to download it?",
-            default=True)
-        if do_download:
-            ctx.obj.download_attachment(read_att, tempfile.tempdir)
-            read_att['data']['path'] = os.path.join(
-                tempfile.tempdir, read_att['data']['filename'])
-        else:
-            return
-    if os.path.exists(read_att['data']['path']):
-        click.echo("Opening '{}'.".format(read_att['data']['path']))
-        click.launch(read_att['data']['path'], wait=False)
-    else:
-        ctx.fail("Could not find file '{}'".format(read_att['data']['path']))
+
+    att_path = ctx.obj.get_attachment_path(read_att)
+    click.echo("Opening '{}'.".format(att_path))
+    click.launch(str(att_path), wait=False)
 
 
 @cli.command("add-note")
