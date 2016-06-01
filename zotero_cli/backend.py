@@ -98,7 +98,7 @@ class ZoteroBackend(object):
         idx_path = os.path.join(click.get_app_dir(APP_NAME), 'index.sqlite')
         self.config = load_config()
         self.note_format = self.config['zotcli.note_format']
-        self.storage_dir = self.config.get('zotcli.storage_directory')
+        self.storage_dir = self.config.get('zotcli.storage_dir')
 
         api_key = api_key or self.config.get('zotcli.api_key')
         library_id = library_id or self.config.get('zotcli.library_id')
@@ -202,7 +202,6 @@ class ZoteroBackend(object):
         storage_method = self.config['zotcli.sync_method']
         if storage_method == 'local':
             return Path(attachment['data']['path'])
-        # Download
         out_path = TEMP_DIR/attachment['data']['filename']
         if out_path.exists():
             return out_path
