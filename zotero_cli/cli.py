@@ -184,9 +184,11 @@ def query(ctx, query, limit):
 
 
 @cli.command()
+@click.option("--with-note", '-n', required=False, is_flag=True, default=False,
+              help="Open the editor for taking notes while reading.")
 @click.argument("item-id", required=True)
 @click.pass_context
-def read(ctx, item_id):
+def read(ctx, item_id, with_note):
     """ Read an item attachment. """
     try:
         item_id = pick_item(ctx.obj, item_id)
@@ -206,6 +208,10 @@ def read(ctx, item_id):
     att_path = ctx.obj.get_attachment_path(read_att)
     click.echo("Opening '{}'.".format(att_path))
     click.launch(str(att_path), wait=False)
+    if with_note:
+        note_body = click.edit(extension=get_extension(ctx.obj.note_format))
+        if note_body:
+            ctx.obj.create_note(item_id, note_body)
 
 
 @cli.command("add-note")
