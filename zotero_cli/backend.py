@@ -276,13 +276,30 @@ class ZoteroBackend(object):
                      'text': note_text,
                      'version': self._zot.last_modified_version(limit=1)+2}
         note['note'] = self._make_note_html(note_data)
-        self._zot.create_items([note], item_id)
+        try:
+            self._zot.create_items([note], item_id)
+        except Exception as e:
+            self._logger.error(e)
+            with open("note_backup.txt", "w") as fp:
+                fp.write(note_data)
+            self._logger.warn(
+                "Could not upload note to Zotero. You can find the note markup
+                in 'note_backup.txt' in the current directory")
 
     def save_note(self, note):
         """ Update an existing note.
 
         :param note:        The updated note
         """
+        raw_data = note['data']['note']
         note['data']['note']['version'] += 1
-        note['data']['note'] = self._make_note_html(note['data']['note'])
-        self._zot.update_item(note)
+        note['data']['note'] = self._make_note_html(raw_data)
+        try:
+            self._zot.update_item(note)
+        except Exception as e:
+            self._logger.error(e)
+            with open("note_backup.txt", "w") as fp:
+                fp.write(raw_data)
+            self._logger.warn(
+                "Could not upload note to Zotero. You can find the note markup
+                in 'note_backup.txt' in the current directory")
