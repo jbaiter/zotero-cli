@@ -283,8 +283,8 @@ class ZoteroBackend(object):
             with open("note_backup.txt", "w") as fp:
                 fp.write(note_data)
             self._logger.warn(
-                "Could not upload note to Zotero. You can find the note markup
-                in 'note_backup.txt' in the current directory")
+                "Could not upload note to Zotero. You can find the note "
+                "markup in 'note_backup.txt' in the current directory")
 
     def save_note(self, note):
         """ Update an existing note.
@@ -301,5 +301,5 @@ class ZoteroBackend(object):
             with open("note_backup.txt", "w") as fp:
                 fp.write(raw_data)
             self._logger.warn(
-                "Could not upload note to Zotero. You can find the note markup
-                in 'note_backup.txt' in the current directory")
+                "Could not upload note to Zotero. You can find the note "
+                "markup in 'note_backup.txt' in the current directory")
