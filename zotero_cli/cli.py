@@ -209,9 +209,28 @@ def read(ctx, item_id, with_note):
     click.echo("Opening '{}'.".format(att_path))
     click.launch(str(att_path), wait=False)
     if with_note:
-        note_body = click.edit(extension=get_extension(ctx.obj.note_format))
-        if note_body:
+        existing_notes = list(ctx.obj.notes(item_id))
+        if existing_notes:
+            edit_existing = click.confirm("Edit exist note?")
+            if edit_existing and len(existing_notes) > 1:
+                note = select(
+                    [(n, re.sub("[^\w]", " ",
+                                n['data']['note']['text'].split('\n')[0]))
+                     for n in existing_notes])
+            elif edit_existing:
+                note = existing_notes[0]
+            else:
+                note = None
+        else:
+            note = None
+        note_body = click.edit(
+            text=note['data']['note']['text'] if note else None,
+            extension=get_extension(ctx.obj.note_format))
+        if note_body and note is None:
             ctx.obj.create_note(item_id, note_body)
+        else:
+            note['data']['note']['text'] = note_body
+            ctx.obj.save_note(note)
 
 
 @cli.command("add-note")

@@ -292,7 +292,7 @@ class ZoteroBackend(object):
         :param note:        The updated note
         """
         raw_data = note['data']['note']
-        note['data']['note']['version'] += 1
+        raw_data['version'] += 1
         note['data']['note'] = self._make_note_html(raw_data)
         try:
             self._zot.update_item(note)
