@@ -212,13 +212,8 @@ def read(ctx, item_id, with_note):
         existing_notes = list(ctx.obj.notes(item_id))
         if existing_notes:
             edit_existing = click.confirm("Edit exist note?")
-            if edit_existing and len(existing_notes) > 1:
-                note = select(
-                    [(n, re.sub("[^\w]", " ",
-                                n['data']['note']['text'].split('\n')[0]))
-                     for n in existing_notes])
-            elif edit_existing:
-                note = existing_notes[0]
+            if edit_existing:
+                note = pick_note(ctx.obj, item_id)
             else:
                 note = None
         else:
@@ -262,9 +257,33 @@ def edit_note(ctx, item_id, note_num):
         item_id = pick_item(ctx.obj, item_id)
     except ValueError as e:
         ctx.fail(e.args[0])
-    notes = tuple(ctx.obj.notes(item_id))
+    note = pick_note(ctx.obj, item_id, note_num)
+    updated_text = click.edit(note['data']['note']['text'],
+                              extension=get_extension(ctx.obj.note_format))
+    if updated_text:
+        note['data']['note']['text'] = updated_text
+        ctx.obj.save_note(note)
+
+
+@cli.command("export-note")
+@click.argument("item-id", required=True)
+@click.argument("note-num", required=False, type=int)
+@click.option("--output", '-o', type=click.File(mode='w'), default='-')
+@click.pass_context
+def export_note(ctx, item_id, note_num, output):
+    """ Export a note. """
+    try:
+        item_id = pick_item(ctx.obj, item_id)
+    except ValueError as e:
+        ctx.fail(e.args[0])
+    note = pick_note(ctx.obj, item_id, note_num)
+    output.write(note['data']['note']['text'].encode('utf8'))
+
+
+def pick_note(zot, item_id, note_num=None):
+    notes = tuple(zot.notes(item_id))
     if not notes:
-        ctx.fail("The item does not have any notes.")
+        zot.fail("The item does not have any notes.")
     if note_num is None:
         if len(notes) > 1:
             note = select(
@@ -275,11 +294,7 @@ def edit_note(ctx, item_id, note_num):
             note = notes[0]
     else:
         note = notes[note_num]
-    updated_text = click.edit(note['data']['note']['text'],
-                              extension=get_extension(ctx.obj.note_format))
-    if updated_text:
-        note['data']['note']['text'] = updated_text
-        ctx.obj.save_note(note)
+    return note
 
 
 def pick_item(zot, item_id):
