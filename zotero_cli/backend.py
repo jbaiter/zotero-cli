@@ -5,9 +5,19 @@ import re
 import tempfile
 import time
 import urllib
-import urlparse
+try:
+    import urlparse
+except ImportError:
+    import urllib.parse as urlparse
+try:
+    urlencode = urllib.urlencode
+except AttributeError:
+    urlencode = urlparse.urlencode
 import zipfile
-from cStringIO import StringIO
+try:
+    from cStringIO import StringIO
+except ImportError:
+    from io import StringIO
 
 
 import click
@@ -64,7 +74,7 @@ class ZoteroBackend(object):
         token, secret = auth.get_request_token(
             params={'oauth_callback': 'oob'})
         auth_url = auth.get_authorize_url(token)
-        auth_url += '&' + urllib.urlencode({
+        auth_url += '&' + urlencode({
             'name': 'zotero-cli',
             'library_access': 1,
             'notes_access': 1,
@@ -112,7 +122,7 @@ class ZoteroBackend(object):
         self._index = SearchIndex(idx_path)
         sync_interval = self.config.get('zotcli.sync_interval', 300)
         since_last_sync = int(time.time()) - self._index.last_modified
-        if since_last_sync >= sync_interval:
+        if since_last_sync >= int(sync_interval):
             self._logger.info("{} seconds since last sync, synchronizing."
                               .format(since_last_sync))
             self.synchronize()

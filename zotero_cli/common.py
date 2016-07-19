@@ -1,5 +1,12 @@
 import os
-import ConfigParser
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
+try:
+    UNICODE_EXISTS = bool(type(unicode))
+except NameError:
+    unicode = lambda s: str(s)
 from collections import namedtuple
 
 import click
@@ -24,7 +31,7 @@ def load_config():
         raise ValueError("Could not find configuration file. Please run "
                          "`zotcli configure` to perform the first-time "
                          "setup.")
-    parser = ConfigParser.RawConfigParser()
+    parser = configparser.RawConfigParser()
     parser.read([cfg_path])
     rv = {}
     for section in parser.sections():
@@ -43,7 +50,7 @@ def save_config(cfgdata):
     cfg_dir = os.path.dirname(cfg_path)
     if not os.path.exists(cfg_dir):
         os.makedirs(cfg_dir)
-    cfg = ConfigParser.SafeConfigParser()
+    cfg = configparser.SafeConfigParser()
     cfg.add_section("zotcli")
     for key, value in cfgdata.items():
         cfg.set("zotcli", key, unicode(value))
