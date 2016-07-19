@@ -9,7 +9,6 @@ except NameError:
     unicode = lambda s: str(s)
 from collections import namedtuple
 
-
 import click
 
 APP_NAME = "zotcli"
