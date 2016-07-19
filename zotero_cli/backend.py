@@ -1,3 +1,4 @@
+import codecs
 import json
 import logging
 import os
@@ -52,6 +53,32 @@ REQUEST_TOKEN_URL = 'https://www.zotero.org/oauth/request'
 AUTH_URL = 'https://www.zotero.org/oauth/authorize'
 ACCESS_TOKEN_URL = 'https://www.zotero.org/oauth/access'
 BASE_URL = 'https://api.zotero.org'
+
+
+def encode_blob(data):
+    """ Encode a dictionary to a base64-encoded compressed binary blob.
+
+    :param data:    data to encode into a blob
+    :type data:     dict
+    :returns:       The data as a compressed base64-encoded binary blob
+    """
+    blob_data = json.dumps(data).encode('utf8')
+    for codec in ('zlib', 'base64'):
+        blob_data = codecs.encode(blob_data, codec)
+    return blob_data
+
+
+def decode_blob(blob_data):
+    """ Decode a base64-encoded, zlib-compressed binary blob to a dictionary.
+
+    :param blob_data:   base64-encoded binary blob, contains zlib-compressed
+                        JSON
+    :type blob_data:    bytes
+    :returns:           The original data as a dictionary
+    """
+    for codec in ('base64', 'zlib'):
+        blob_data = codecs.decode(blob_data, codec)
+    return json.loads(blob_data.decode('utf8'))
 
 
 class ZoteroBackend(object):
@@ -246,7 +273,7 @@ class ZoteroBackend(object):
         blobs = DATA_PAT.findall(note_html)
         # Previously edited with zotcli
         if blobs:
-            data = json.loads(blobs[0].decode('base64').decode('zlib'))
+            data = decode_blob(blobs[0])
             if 'version' not in data:
                 data['version'] = note_version
             note_html = DATA_PAT.sub("", note_html)
@@ -269,8 +296,7 @@ class ZoteroBackend(object):
         :param note_data:   dict with text, format and version of the note
         :returns:           Note as HTML
         """
-        extra_data = DATA_TMPL.format(
-            data=json.dumps(note_data).encode('zlib').encode('base64'))
+        extra_data = DATA_TMPL.format(data=encode_blob(note_data))
         html = pypandoc.convert(note_data['text'], 'html',
                                 format=note_data['format'])
         return html + extra_data
