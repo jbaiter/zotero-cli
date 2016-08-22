@@ -335,7 +335,7 @@ class ZoteroBackend(object):
         except Exception as e:
             self._logger.error(e)
             with open("note_backup.txt", "w") as fp:
-                fp.write(raw_data['text'])
+                fp.write(raw_data['text'].encode('utf-8'))
             self._logger.warn(
                 "Could not upload note to Zotero. You can find the note "
                 "markup in 'note_backup.txt' in the current directory")
