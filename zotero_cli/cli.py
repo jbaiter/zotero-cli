@@ -223,7 +223,7 @@ def read(ctx, item_id, with_note):
             extension=get_extension(ctx.obj.note_format))
         if note_body and note is None:
             ctx.obj.create_note(item_id, note_body)
-        else:
+        elif note_body:
             note['data']['note']['text'] = note_body
             ctx.obj.save_note(note)
 
