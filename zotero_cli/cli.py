@@ -118,7 +118,7 @@ def configure():
         while True:
             if not config.get('webdav_path'):
                 config['webdav_path'] = click.prompt(
-                    "Please enter the WebDAV URL")
+                    "Please enter the WebDAV URL (without '/zotero'!)")
             if not config.get('webdav_user'):
                 config['webdav_user'] = click.prompt(
                     "Please enter the WebDAV user name")
@@ -211,7 +211,7 @@ def read(ctx, item_id, with_note):
     if with_note:
         existing_notes = list(ctx.obj.notes(item_id))
         if existing_notes:
-            edit_existing = click.confirm("Edit exist note?")
+            edit_existing = click.confirm("Edit existing note?")
             if edit_existing:
                 note = pick_note(ctx.obj, item_id)
             else:
