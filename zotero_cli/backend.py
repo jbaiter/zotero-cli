@@ -18,7 +18,8 @@ import zipfile
 try:
     from cStringIO import StringIO
 except ImportError:
-    from io import StringIO
+    # Python 3
+    from io import BytesIO as StringIO
 
 
 import click
