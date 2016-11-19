@@ -315,6 +315,7 @@ def pick_item(zot, item_id):
             return items[0].key
         else:
             raise ValueError("Could not find any items for the query.")
+    return item_id
 
 
 def select(choices, prompt="Please choose one", default=0, required=True):
