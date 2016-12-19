@@ -39,16 +39,21 @@ def find_storage_directories():
     home_dir = pathlib.Path(os.environ['HOME'])
     firefox_dir = home_dir/".mozilla"/"firefox"
     zotero_dir = home_dir/".zotero"
-    candidate_iter = itertools.chain(firefox_dir.iterdir(),
-                                     zotero_dir.iterdir())
-    for fpath in candidate_iter:
+
+    osx_support_dir = home_dir/"Library"/"Application Support"
+    zotero_osx_dir = osx_support_dir/"Zotero"/"Profiles"
+
+    candidates = [firefox_dir, zotero_dir, zotero_osx_dir]
+    for fpath in candidates:
         if not fpath.is_dir():
             continue
-        match = PROFILE_PAT.match(fpath.name)
-        if match:
-            storage_path = fpath/"zotero"/"storage"
-            if storage_path.exists():
-                yield (match.group(2), storage_path)
+
+        for subdir in fpath.iterdir():
+            match = PROFILE_PAT.match(subdir.name)
+            if match:
+                storage_path = subdir/"zotero"/"storage"
+                if storage_path.exists():
+                    yield (match.group(2), storage_path)
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
