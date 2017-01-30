@@ -36,11 +36,16 @@ def get_extension(pandoc_fmt):
 
 
 def find_storage_directories():
+    import pdb; pdb.set_trace()
     home_dir = pathlib.Path(os.environ['HOME'])
+    candidates = []
     firefox_dir = home_dir/".mozilla"/"firefox"
+    if firefox_dir.exists():
+        candidates.append(firefox_dir.iterdir())
     zotero_dir = home_dir/".zotero"
-    candidate_iter = itertools.chain(firefox_dir.iterdir(),
-                                     zotero_dir.iterdir())
+    if zotero_dir.exists():
+        candidates.append(zotero_dir.iterdir())
+    candidate_iter = itertools.chain.from_iterable(candidates)
     for fpath in candidate_iter:
         if not fpath.is_dir():
             continue
