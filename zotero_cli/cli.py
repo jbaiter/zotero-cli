@@ -9,7 +9,7 @@ import pathlib
 import pypandoc
 import requests
 
-from zotero_cli.common import save_config
+from zotero_cli.common import save_config, load_config
 from zotero_cli.backend import ZoteroBackend
 
 EXTENSION_MAP = {
@@ -36,7 +36,6 @@ def get_extension(pandoc_fmt):
 
 
 def find_storage_directories():
-    import pdb; pdb.set_trace()
     home_dir = pathlib.Path(os.environ['HOME'])
     candidates = []
     firefox_dir = home_dir/".mozilla"/"firefox"
@@ -60,8 +59,9 @@ def find_storage_directories():
 @click.option('--verbose', '-v', is_flag=True)
 @click.option('--api-key', default=None)
 @click.option('--library-id', default=None)
+@click.option('--local-attachment-dir', default=None)
 @click.pass_context
-def cli(ctx, verbose, api_key, library_id):
+def cli(ctx, verbose, api_key, library_id, local_attachment_dir):
     """ Command-line access to your Zotero library. """
     logging.basicConfig(level=logging.DEBUG if verbose else logging.WARNING)
     if ctx.invoked_subcommand != 'configure':
@@ -119,6 +119,13 @@ def configure():
                 else:
                     config['storage_dir'] = storage_dir
                     break
+        local_attachment_dir = click.confirm("Do you have a separate "
+                                                "directory for attachments?")
+        if local_attachment_dir:
+            print('hey')
+            config['local_attachment_dir'] = click.prompt(
+                "Please enter the path to your local attachment directory",
+                default='')
     elif sync_method == "webdav":
         while True:
             if not config.get('webdav_path'):
@@ -209,8 +216,15 @@ def read(ctx, item_id, with_note):
                            for att in attachments])
     else:
         read_att = attachments[0]
-
-    att_path = ctx.obj.get_attachment_path(read_att)
+    try:
+        att_path = ctx.obj.get_attachment_path(read_att)
+    except ValueError: # When the document is not found on the server
+        # Currently only works with a flat directory layout. Would need
+        # to add wildcard matching or have the user specify the directory
+        # hierarchy and extract the relevant fields from the items' metadata,
+        # in order to match nested directory layouts.
+        ctx.config = load_config()
+        att_path = ctx.config['zotcli.local_attachment_dir'] + read_att['data']['title']
     click.echo("Opening '{}'.".format(att_path))
     click.launch(str(att_path), wait=False)
     if with_note:
