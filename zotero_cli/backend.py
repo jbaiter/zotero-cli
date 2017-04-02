@@ -280,7 +280,9 @@ class ZoteroBackend(object):
             note_html = DATA_PAT.sub("", note_html)
         # Not previously edited with zotcli or updated from the Zotero UI
         if not data or data['version'] < note_version:
-            if data['version'] < note_version:
+            if not data:
+                pass
+            elif data['version'] < note_version:
                 self._logger.info("Note changed on server, reloading markup.")
             note_format = data['format'] if data else self.note_format
             data = {
