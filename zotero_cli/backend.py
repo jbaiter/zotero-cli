@@ -235,8 +235,17 @@ class ZoteroBackend(object):
 
     def get_attachment_path(self, attachment):
         if not attachment['data']['linkMode'].startswith("imported"):
-            raise ValueError(
-                "Attachment is not stored on server, cannot download!")
+            # Currently only works with a flat directory layout. Would need
+            # to add wildcard matching or have the user specify the directory
+            # hierarchy and extract the relevant fields from the metadata
+            # in order to match nested directory layouts.
+            if self.config['zotcli.local_attachment_dir']:
+                return self.config['zotcli.local_attachment_dir'] + \
+                    attachment['data']['title']
+            else:
+                raise ValueError(
+                    "Attachment is not stored on server and no "
+                    "local attachment directory is specified.")
         storage_method = self.config['zotcli.sync_method']
         if storage_method == 'local':
             return Path(attachment['data']['path'])
