@@ -12,16 +12,17 @@ SCHEMA = """
         version     INTEGER
     );
     CREATE TABLE IF NOT EXISTS items (
-        id      INTEGER PRIMARY KEY,
-        key     TEXT UNIQUE,
-        creator TEXT,
-        title   TEXT,
-        date    TEXT,
-        citekey TEXT UNIQUE
+        id          INTEGER PRIMARY KEY,
+        key         TEXT UNIQUE,
+        creator     TEXT,
+        title       TEXT,
+        abstract    TEXT,
+        date        TEXT,
+        citekey     TEXT UNIQUE
     );
 
     CREATE VIRTUAL TABLE items_idx USING fts4(
-        key, creator, title, date, citekey,
+        key, creator, title, abstract, date, citekey,
         content="items");
     CREATE VIRTUAL TABLE items_idx_terms USING fts4aux(items_idx);
 
@@ -33,25 +34,25 @@ SCHEMA = """
     END;
 
     CREATE TRIGGER items_au AFTER UPDATE ON items BEGIN
-        INSERT INTO items_idx(docid, key, creator, title, date, citekey)
-            VALUES(new.rowid, new.key, new.creator, new.title, new.date,
+        INSERT INTO items_idx(docid, key, creator, title, abstract, date, citekey)
+            VALUES(new.rowid, new.key, new.creator, new.title, new.abstract, new.date,
                    new.citekey);
     END;
     CREATE TRIGGER items_ai AFTER INSERT ON items BEGIN
-        INSERT INTO items_idx(docid, key, creator, title, date, citekey)
-            VALUES(new.rowid, new.key, new.creator, new.title, new.date,
+        INSERT INTO items_idx(docid, key, creator, title, abstract, date, citekey)
+            VALUES(new.rowid, new.key, new.creator, new.title, new.abstract, new.date,
                    new.citekey);
     END;
 """
 SEARCH_QUERY = """
-    SELECT items.key, creator, title, date, citekey FROM items JOIN (
+    SELECT items.key, creator, title, abstract, date, citekey FROM items JOIN (
         SELECT key FROM items_idx
         WHERE items_idx MATCH :query) AS idx ON idx.key = items.key
         LIMIT :limit;
 """
 INSERT_ITEMS_QUERY = """
-    INSERT OR REPLACE INTO items (key, creator, title, date, citekey)
-        VALUES (:key, :creator, :title, :date, :citekey);
+    INSERT OR REPLACE INTO items (key, creator, title, abstract, date, citekey)
+        VALUES (:key, :creator, :title, :abstract, :date, :citekey);
 """
 INSERT_META_QUERY = """
     INSERT OR REPLACE INTO syncinfo (id, last_sync, version)
