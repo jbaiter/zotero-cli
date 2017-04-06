@@ -272,7 +272,10 @@ class ZoteroBackend(object):
         data = None
         note_html = note_data['data']['note']
         note_version = note_data['version']
-        blobs = DATA_PAT.findall(note_html)
+        # This is temporary and _very_ ugly
+        blobs = [codecs.unicode_escape_decode(re.compile('title=.*n\'\">')
+            .findall(note_html)[0][9:-3])[0].encode('utf8')]
+        #blobs = DATA_PAT.findall(note_html)
         # Previously edited with zotcli
         if blobs:
             data = decode_blob(blobs[0])
