@@ -13,7 +13,7 @@ import click
 
 APP_NAME = "zotcli"
 
-Item = namedtuple("Item", ("key", "creator", "title", "date", "citekey"))
+Item = namedtuple("Item", ("key", "creator", "title", "abstract", "date", "citekey"))
 
 
 def _get_config_path():
