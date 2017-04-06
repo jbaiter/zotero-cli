@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import sys
 import tempfile
 import time
 import urllib
@@ -32,7 +33,7 @@ from rauth import OAuth1Service
 from zotero_cli.common import APP_NAME, Item, load_config
 from zotero_cli.index import SearchIndex
 
-
+IS_PY3 = sys.version_info > (2,)
 TEMP_DIR = Path(tempfile.mkdtemp(prefix='zotcli'))
 DATA_PAT = re.compile(
     r'<div class="zotcli-note">.*<p .*title="([A-Za-z0-9+/=\n ]+)">.*</div>',
@@ -41,9 +42,9 @@ CITEKEY_PAT = re.compile(r'^bibtex: (.*)$', flags=re.MULTILINE)
 DATA_TMPL = """
     <div class="zotcli-note">
         <p xmlns="http://www.w3.org/1999/xhtml"
-        id="zotcli-data" style="color: #cccccc;"
-        xml:base="http://www.w3.org/1999/xhtml"
-        title="{data}">
+           id="zotcli-data" style="color: #cccccc;"
+           xml:base="http://www.w3.org/1999/xhtml"
+           title="{data}">
         (hidden zotcli data)
         </p>
     </div>
@@ -66,7 +67,7 @@ def encode_blob(data):
     blob_data = json.dumps(data).encode('utf8')
     for codec in ('zlib', 'base64'):
         blob_data = codecs.encode(blob_data, codec)
-    return blob_data
+    return blob_data.replace(b'\n', b'')
 
 
 def decode_blob(blob_data):
@@ -77,6 +78,8 @@ def decode_blob(blob_data):
     :type blob_data:    bytes
     :returns:           The original data as a dictionary
     """
+    if IS_PY3:
+        blob_data = blob_data.encode('utf8')
     for codec in ('base64', 'zlib'):
         blob_data = codecs.decode(blob_data, codec)
     return json.loads(blob_data.decode('utf8'))
@@ -272,6 +275,10 @@ class ZoteroBackend(object):
         data = None
         note_html = note_data['data']['note']
         note_version = note_data['version']
+        if "title=\"b'" in note_html:
+            # Fix for badly formatted notes from an earlier version (see #26)
+            note_html = re.sub(r'title="b\'(.*?)\'"', r'title="\1"', note_html)
+            note_html = note_html.replace("\\n", "")
         blobs = DATA_PAT.findall(note_html)
         # Previously edited with zotcli
         if blobs:
@@ -281,9 +288,7 @@ class ZoteroBackend(object):
             note_html = DATA_PAT.sub("", note_html)
         # Not previously edited with zotcli or updated from the Zotero UI
         if not data or data['version'] < note_version:
-            if not data:
-                pass
-            elif data['version'] < note_version:
+            if data and data['version'] < note_version:
                 self._logger.info("Note changed on server, reloading markup.")
             note_format = data['format'] if data else self.note_format
             data = {
@@ -300,7 +305,8 @@ class ZoteroBackend(object):
         :param note_data:   dict with text, format and version of the note
         :returns:           Note as HTML
         """
-        extra_data = DATA_TMPL.format(data=encode_blob(note_data))
+        extra_data = DATA_TMPL.format(
+            data=encode_blob(note_data).decode('utf8'))
         html = pypandoc.convert(note_data['text'], 'html',
                                 format=note_data['format'])
         return html + extra_data
