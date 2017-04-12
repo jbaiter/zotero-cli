@@ -150,6 +150,7 @@ def configure():
                 config['webdav_user'] = None
             else:
                 click.echo("Unknown error, please check your settings.")
+                click.echo("Server response code was: {}".format(test_resp.status_code))
                 config['webdav_path'] = None
                 config['webdav_user'] = None
     config['sync_method'] = sync_method
