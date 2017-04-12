@@ -132,7 +132,7 @@ def configure():
                 config['webdav_pass'] = click.prompt(
                     "Please enter the WebDAV password")
             try:
-                test_resp = requests.get(
+                test_resp = requests.options(
                     config['webdav_path'],
                     auth=(config['webdav_user'],
                           config['webdav_pass']))
@@ -140,7 +140,7 @@ def configure():
                 click.echo("Invalid WebDAV URL, could not reach server.")
                 config['webdav_path'] = None
                 continue
-            if test_resp.status_code == 501:
+            if test_resp.status_code == 200:
                 break
             elif test_resp.status_code == 404:
                 click.echo("Invalid WebDAV path, does not exist.")
@@ -150,7 +150,8 @@ def configure():
                 config['webdav_user'] = None
             else:
                 click.echo("Unknown error, please check your settings.")
-                click.echo("Server response code was: {}".format(test_resp.status_code))
+                click.echo("Server response code was: {}"
+                           .format(test_resp.status_code))
                 config['webdav_path'] = None
                 config['webdav_user'] = None
     config['sync_method'] = sync_method
