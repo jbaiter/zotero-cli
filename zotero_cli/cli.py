@@ -36,7 +36,6 @@ def get_extension(pandoc_fmt):
 
 
 def find_storage_directories():
-    import pdb; pdb.set_trace()
     home_dir = pathlib.Path(os.environ['HOME'])
     candidates = []
     firefox_dir = home_dir/".mozilla"/"firefox"
