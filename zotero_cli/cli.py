@@ -45,7 +45,7 @@ def find_storage_directories():
     if zotero_dir.exists():
         candidates.append(zotero_dir.iterdir())
     zotero5_dir = home_dir/"Zotero/storage"
-    if zotero_dir.exists():
+    if zotero5_dir.exists():
         yield ('default', zotero5_dir)
     candidate_iter = itertools.chain.from_iterable(candidates)
     for fpath in candidate_iter:
