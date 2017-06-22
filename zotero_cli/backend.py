@@ -33,6 +33,8 @@ from rauth import OAuth1Service
 from zotero_cli.common import APP_NAME, Item, load_config
 from zotero_cli.index import SearchIndex
 
+from io import open
+
 IS_PY3 = sys.version_info > (2,)
 TEMP_DIR = Path(tempfile.mkdtemp(prefix='zotcli'))
 DATA_PAT = re.compile(
@@ -326,8 +328,8 @@ class ZoteroBackend(object):
             self._zot.create_items([note], item_id)
         except Exception as e:
             self._logger.error(e)
-            with open("note_backup.txt", "w") as fp:
-                fp.write(raw_data['text'].encode('utf-8'))
+            with open("note_backup.txt", "w", encoding='utf-8') as fp:
+                fp.write(raw_data['text'])
             self._logger.warn(
                 "Could not upload note to Zotero. You can find the note "
                 "markup in 'note_backup.txt' in the current directory")
@@ -344,8 +346,8 @@ class ZoteroBackend(object):
             self._zot.update_item(note)
         except Exception as e:
             self._logger.error(e)
-            with open("note_backup.txt", "w") as fp:
-                fp.write(raw_data['text'].encode('utf-8'))
+            with open("note_backup.txt", "w", encoding='utf-8') as fp:
+                fp.write(raw_data['text'])
             self._logger.warn(
                 "Could not upload note to Zotero. You can find the note "
                 "markup in 'note_backup.txt' in the current directory")
