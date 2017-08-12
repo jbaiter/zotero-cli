@@ -46,7 +46,7 @@ def find_storage_directories():
         if zotero_dir.exists():
             candidates.append(zotero_dir.iterdir())
         zotero5_dir = home_dir/"Zotero/storage"
-        if zotero_dir.exists():
+        if zotero5_dir.exists():
             yield ('default', zotero5_dir)
     elif sys.platform == "win32":
         win_support_dir = home_dir/"AppData"/"Roaming"
