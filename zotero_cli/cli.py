@@ -38,15 +38,26 @@ def get_extension(pandoc_fmt):
 def find_storage_directories():
     home_dir = pathlib.Path(os.environ['HOME'])
     candidates = []
-    firefox_dir = home_dir/".mozilla"/"firefox"
-    if firefox_dir.exists():
-        candidates.append(firefox_dir.iterdir())
-    zotero_dir = home_dir/".zotero"
-    if zotero_dir.exists():
-        candidates.append(zotero_dir.iterdir())
-    zotero5_dir = home_dir/"Zotero/storage"
-    if zotero_dir.exists():
-        yield ('default', zotero5_dir)
+    if sys.platform == "linux" or sys.platform == "linux2":
+        firefox_dir = home_dir/".mozilla"/"firefox"
+        if firefox_dir.exists():
+            candidates.append(firefox_dir.iterdir())
+        zotero_dir = home_dir/".zotero"
+        if zotero_dir.exists():
+            candidates.append(zotero_dir.iterdir())
+        zotero5_dir = home_dir/"Zotero/storage"
+        if zotero_dir.exists():
+            yield ('default', zotero5_dir)
+    elif sys.platform == "win32":
+        win_support_dir = home_dir/"AppData"/"Roaming"
+        zotero_win_dir = win_support_dir/"Zotero"/"Zotero"/"Profiles"
+        if zotero_win_dir.exists():
+            candidates.append(zotero_win_dir.iterdir())
+    elif sys.platform == "darwin":
+        osx_support_dir = home_dir/"Library"/"Application Support"
+        zotero_osx_dir = osx_support_dir/"Zotero"/"Profiles"
+        if zotero_osx_dir.exists():
+            candidates.append(zotero_osx_dir.iterdir())
     candidate_iter = itertools.chain.from_iterable(candidates)
     for fpath in candidate_iter:
         if not fpath.is_dir():
