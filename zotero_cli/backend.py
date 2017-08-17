@@ -125,7 +125,8 @@ class ZoteroBackend(object):
         access = urlparse.parse_qs(token_resp.text)
         return access['oauth_token'][0], access['userID'][0]
 
-    def __init__(self, api_key=None, library_id=None, library_type='user'):
+    def __init__(self, api_key=None, library_id=None, library_type='user',
+                 autosync=False):
         """ Service class for communicating with the Zotero API.
 
         This is mainly a thin wrapper around :py:class:`pyzotero.zotero.Zotero`
@@ -155,10 +156,11 @@ class ZoteroBackend(object):
         self._index = SearchIndex(idx_path)
         sync_interval = self.config.get('zotcli.sync_interval', 300)
         since_last_sync = int(time.time()) - self._index.last_modified
-        if since_last_sync >= int(sync_interval):
-            self._logger.info("{} seconds since last sync, synchronizing."
-                              .format(since_last_sync))
-            self.synchronize()
+        if autosync and since_last_sync >= int(sync_interval):
+            click.echo("{} seconds since last sync, synchronizing."
+                       .format(since_last_sync))
+            num_updated = self.synchronize()
+            click.echo("Updated {} items".format(num_updated))
 
     def synchronize(self):
         """ Update the local index to the latest library version. """
@@ -189,23 +191,30 @@ class ZoteroBackend(object):
         :type recursive: bool
         :returns:       Generator that yields items
         """
+        if limit is None:
+            limit = 100
         query_args = {'since': since}
         if query:
             query_args['q'] = query
         if limit:
             query_args['limit'] = limit
         query_fn = self._zot.items if recursive else self._zot.top
-        items = self._zot.makeiter(query_fn(**query_args))
-        for chunk in items:
-            for it in chunk:
-                matches = CITEKEY_PAT.finditer(it['data'].get('extra', ''))
-                citekey = next((m.group(1) for m in matches), None)
-                yield Item(key=it['data']['key'],
-                           creator=it['meta'].get('creatorSummary'),
-                           title=it['data'].get('title', "Untitled"),
-                           abstract=it['data'].get('abstractNote'),
-                           date=it['data'].get('date'),
-                           citekey=citekey)
+        # NOTE: Normally we'd use the makeiter method of Zotero, but it seems
+        #       to be broken at the moment, thus we call .follow ourselves
+        items = query_fn(**query_args)
+        last_url = self._zot.links.get('last')
+        if last_url:
+            while self._zot.links['self'] != last_url:
+                items.extend(self._zot.follow())
+        for it in items:
+            matches = CITEKEY_PAT.finditer(it['data'].get('extra', ''))
+            citekey = next((m.group(1) for m in matches), None)
+            yield Item(key=it['data']['key'],
+                       creator=it['meta'].get('creatorSummary'),
+                       title=it['data'].get('title', "Untitled"),
+                       abstract=it['data'].get('abstractNote'),
+                       date=it['data'].get('date'),
+                       citekey=citekey)
 
     def notes(self, item_id):
         """ Get a list of all notes for a given item.
@@ -329,7 +338,7 @@ class ZoteroBackend(object):
         except Exception as e:
             self._logger.error(e)
             with open("note_backup.txt", "w", encoding='utf-8') as fp:
-                fp.write(raw_data['text'])
+                fp.write(note_data['text'])
             self._logger.warn(
                 "Could not upload note to Zotero. You can find the note "
                 "markup in 'note_backup.txt' in the current directory")

@@ -77,10 +77,12 @@ def find_storage_directories():
 @click.pass_context
 def cli(ctx, verbose, api_key, library_id):
     """ Command-line access to your Zotero library. """
-    logging.basicConfig(level=logging.DEBUG if verbose else logging.WARNING)
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
     if ctx.invoked_subcommand != 'configure':
         try:
-            ctx.obj = ZoteroBackend(api_key, library_id, 'user')
+            ctx.obj = ZoteroBackend(
+                api_key, library_id, 'user',
+                autosync=(ctx.invoked_subcommand != 'sync'))
         except ValueError as e:
             ctx.fail(e.args[0])
 
@@ -183,6 +185,7 @@ def configure():
 @click.pass_context
 def sync(ctx):
     """ Synchronize the local search index. """
+    click.echo("Synchronizing")
     num_items = ctx.obj.synchronize()
     click.echo("Updated {} items.".format(num_items))
 
