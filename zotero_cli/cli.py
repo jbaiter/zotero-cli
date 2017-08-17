@@ -74,8 +74,9 @@ def find_storage_directories():
 @click.option('--verbose', '-v', is_flag=True)
 @click.option('--api-key', default=None)
 @click.option('--library-id', default=None)
+@click.option('--local-attachment-dir', default=None)
 @click.pass_context
-def cli(ctx, verbose, api_key, library_id):
+def cli(ctx, verbose, api_key, library_id, local_attachment_dir):
     """ Command-line access to your Zotero library. """
     logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO)
     if ctx.invoked_subcommand != 'configure':
@@ -135,6 +136,12 @@ def configure():
                 else:
                     config['storage_dir'] = storage_dir
                     break
+        local_attachment_dir = click.confirm("Do you have a separate "
+                                                "directory for attachments?")
+        if local_attachment_dir:
+            config['local_attachment_dir'] = click.prompt(
+                "Please enter the path to your local attachment directory",
+                default='')
     elif sync_method == "webdav":
         while True:
             if not config.get('webdav_path'):
