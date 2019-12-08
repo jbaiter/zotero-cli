@@ -48,7 +48,7 @@ def find_storage_directories():
             candidates.append(zotero_dir.iterdir())
         zotero5_dir = home_dir/"Zotero/storage"
         if zotero5_dir.exists():
-            yield ('default', zotero5_dir)
+            yield (str(zotero5_dir), 'default')
     elif sys.platform == "win32":
         win_support_dir = home_dir/"AppData"/"Roaming"
         zotero_win_dir = win_support_dir/"Zotero"/"Zotero"/"Profiles"
@@ -67,7 +67,7 @@ def find_storage_directories():
         if match:
             storage_path = fpath/"zotero"/"storage"
             if storage_path.exists():
-                yield (match.group(2), storage_path)
+                yield (str(storage_path), match.group(2))
 
 
 @click.group(context_settings={'help_option_names': ['-h', '--help']})
@@ -116,6 +116,7 @@ def configure():
                        for name, path in storage_dirs]
             config['storage_dir'] = select(
                 options, required=False,
+                default=0,
                 prompt="Please select a storage directory (-1 to enter "
                        "manually)")
         if config.get('storage_dir') is None:
